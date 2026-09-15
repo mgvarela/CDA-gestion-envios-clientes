@@ -37,7 +37,7 @@
   </div>
 </div>
 
-<!-- Panel Principal (Oculto hasta autenticarse) -->
+<!-- Panel Principal -->
 <div id="appSection" class="container-fluid p-4 d-none">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
@@ -65,13 +65,14 @@
             <th>Nombre</th>
             <th>Pedido</th>
             <th>Mail</th>
-            <th>Plantilla</th>
+            <th width="220">Plantilla Asignada</th>
+            <th>Enviar</th>
             <th>Estado</th>
             <th class="text-center">Acciones</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="6" class="text-center py-4">Cargando datos...</td></tr>
+          <tr><td colspan="7" class="text-center py-4">Cargando datos...</td></tr>
         </tbody>
       </table>
     </div>
@@ -142,7 +143,7 @@
 </div>
 
 <script>
-  // ⚠️ REEMPLAZÁ ESTOS DOS VALORES CON TUS CLAVES REALES DE SUPABASE
+  // ⚠️ CREDENCIALES DE SUPABASE
   const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
   const SUPABASE_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
   
@@ -184,11 +185,11 @@
 
   // 2. Consulta de Datos
   async function cargarDatos() {
-    const { data: clientes } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
     const { data: templates } = await supabaseClient.from('templates').select('*');
+    const { data: clientes } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
     
-    clientesData = clientes || [];
     templatesData = templates || [];
+    clientesData = clientes || [];
     
     renderTabla();
     renderTemplates();
@@ -199,7 +200,7 @@
     tbody.innerHTML = '';
 
     if (clientesData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Sin clientes registrados.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Sin clientes registrados.</td></tr>';
       return;
     }
 
@@ -209,12 +210,28 @@
       if (c.estado === 'enviado') badgeClass = 'badge-enviado';
       if (c.estado === 'error') badgeClass = 'badge-error';
 
+      // Construcción del selector desplegable de plantillas
+      let selectOptions = `<option value="">Seleccionar plantilla...</option>`;
+      templatesData.forEach(t => {
+        let isSelected = (t.id === c.template_id) ? 'selected' : '';
+        selectOptions += `<option value="${t.id}" ${isSelected}>${t.nombre}</option>`;
+      });
+
       tbody.innerHTML += `
         <tr>
           <td><strong>${c.nombre}</strong></td>
           <td>${c.pedido || '-'}</td>
           <td>${c.mail}</td>
-          <td>${c.template_id || 'Sin asignar'}</td>
+          <td>
+            <select class="form-select form-select-sm" onchange="asignarPlantilla('${c.id}', this.value)">
+              ${selectOptions}
+            </select>
+          </td>
+          <td>
+            <button class="btn btn-sm btn-primary" onclick="enviarMail('${c.id}')">
+              <i class="bi bi-send"></i> Enviar
+            </button>
+          </td>
           <td><span class="badge ${badgeClass}">${c.estado}</span></td>
           <td class="text-center">
             <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente('${c.id}')"><i class="bi bi-trash"></i></button>
@@ -232,7 +249,48 @@
     });
   }
 
-  // 3. Crear Cliente
+  // 3. Asignar Plantilla a Cliente
+  async function asignarPlantilla(clienteId, templateId) {
+    const { error } = await supabaseClient
+      .from('clientes')
+      .update({ template_id: templateId })
+      .eq('id', clienteId);
+
+    if (error) {
+      alert("Error al asignar plantilla: " + error.message);
+    }
+  }
+
+  // 4. Enviar Correo (Abre el cliente de correo con las variables reemplazadas)
+  async function enviarMail(clienteId) {
+    const cliente = clientesData.find(c => c.id === clienteId);
+    if (!cliente) return;
+
+    if (!cliente.template_id) {
+      alert("Por favor, selecciona una plantilla para este cliente antes de enviar.");
+      return;
+    }
+
+    const template = templatesData.find(t => t.id === cliente.template_id);
+    if (!template) {
+      alert("La plantilla seleccionada no existe.");
+      return;
+    }
+
+    // Reemplazar variables {{nombre}} y {{pedido}}
+    let asunto = encodeURIComponent(template.nombre.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || ''));
+    let cuerpo = encodeURIComponent(template.cuerpo.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || ''));
+
+    // Actualizar estado a enviado en Supabase
+    await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
+
+    // Abrir cliente de mail (Outlook/Gmail)
+    window.location.href = `mailto:${cliente.mail}?subject=${asunto}&body=${cuerpo}`;
+
+    cargarDatos();
+  }
+
+  // 5. Crear Cliente
   async function guardarCliente() {
     const nombre = document.getElementById('newNombre').value;
     const pedido = document.getElementById('newPedido').value;
@@ -253,7 +311,7 @@
     }
   }
 
-  // 4. Crear Plantilla
+  // 6. Crear Plantilla
   async function guardarTemplate() {
     const id = document.getElementById('tplId').value;
     const nombre = document.getElementById('tplNombre').value;
@@ -273,7 +331,7 @@
     }
   }
 
-  // 5. Eliminar Cliente
+  // 7. Eliminar Cliente
   async function eliminarCliente(id) {
     if (confirm("¿Estás seguro de eliminar este registro?")) {
       await supabaseClient.from('clientes').delete().eq('id', id);
