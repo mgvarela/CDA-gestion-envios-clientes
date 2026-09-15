@@ -6,7 +6,12 @@
   <title>Gestión de Pedidos y Envíos</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  
+  <!-- SDK de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SDK de EmailJS -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
   <style>
     body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding-bottom: 40px; }
     .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
@@ -143,19 +148,24 @@
 </div>
 
 <script>
-  const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
+  // 1. CONFIGURACIÓN DE SUPABASE
+ const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
   const SUPABASE_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
+
+  // 2. CONFIGURACIÓN DE EMAILJS
+ const EMAILJS_SERVICE_ID = "service_n9o55gp";   
+  const EMAILJS_TEMPLATE_ID = "template_s8suav5" ;
+  const EMAILJS_PUBLIC_KEY = "dMP4M9-N0dQmfzrI5";           
+ 
   
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // 2. CONFIGURACIÓN DE EMAILJS (AQUÍ REEMPLAZÁS TUS CLAVES REALES)
-  const EMAILJS_SERVICE_ID = "template_s8suav5";    // El ID de tu Email Service en EmailJS
-  const EMAILJS_TEMPLATE_ID = "service_n9o55gp";  // El ID de tu Email Template
-  const EMAILJS_PUBLIC_KEY = "dMP4M9-N0dQmfzrI5";            // Tu Public Key de Account > API Keys
+  // Inicialización de Servicios
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+  }
 
-  // Inicializar EmailJS
-  emailjs.init(EMAILJS_PUBLIC_KEY);
-  
   let clientesData = [];
   let templatesData = [];
 
@@ -232,11 +242,11 @@
             </select>
           </td>
           <td>
-            <button class="btn btn-sm btn-primary" onclick="enviarMail('${c.id}')">
+            <button class="btn btn-sm btn-primary" id="btn-send-${c.id}" onclick="enviarMail('${c.id}')">
               <i class="bi bi-send"></i> Enviar
             </button>
           </td>
-          <td><span class="badge ${badgeClass}">${c.estado}</span></td>
+          <td><span class="badge ${badgeClass}" id="badge-${c.id}">${c.estado}</span></td>
           <td class="text-center">
             <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente('${c.id}')"><i class="bi bi-trash"></i></button>
           </td>
@@ -254,13 +264,11 @@
   }
 
   async function asignarPlantilla(clienteId, templateId) {
-    // 1. Actualizar memoria local inmediatamente
     const cliente = clientesData.find(c => String(c.id) === String(clienteId));
     if (cliente) {
       cliente.template_id = templateId;
     }
 
-    // 2. Persistir en Supabase
     const { error } = await supabaseClient
       .from('clientes')
       .update({ template_id: templateId })
@@ -286,13 +294,33 @@
       return;
     }
 
-    let asunto = encodeURIComponent(template.nombre.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || ''));
-    let cuerpo = encodeURIComponent(template.cuerpo.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || ''));
+    const asuntoFinal = template.nombre.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || '');
+    const cuerpoFinal = template.cuerpo.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || '');
 
-    await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
+    const btn = document.getElementById(`btn-send-${clienteId}`);
+    if (btn) btn.disabled = true;
 
-    window.location.href = `mailto:${cliente.mail}?subject=${asunto}&body=${cuerpo}`;
-    cargarDatos();
+    try {
+      const params = {
+        email_destino: cliente.mail,
+        asunto: asuntoFinal,
+        mensaje: cuerpoFinal
+      };
+
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+
+      await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
+      
+      alert(`📧 Mail enviado con éxito a ${cliente.mail}`);
+      cargarDatos();
+
+    } catch (err) {
+      alert("❌ Error al enviar mail: " + JSON.stringify(err));
+      await supabaseClient.from('clientes').update({ estado: 'error' }).eq('id', clienteId);
+      cargarDatos();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   async function guardarCliente() {
