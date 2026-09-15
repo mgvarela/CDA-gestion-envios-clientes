@@ -65,7 +65,7 @@
             <th>Nombre</th>
             <th>Pedido</th>
             <th>Mail</th>
-            <th width="220">Plantilla Asignada</th>
+            <th width="240">Plantilla Asignada</th>
             <th>Enviar</th>
             <th>Estado</th>
             <th class="text-center">Acciones</th>
@@ -143,7 +143,6 @@
 </div>
 
 <script>
-  // ⚠️ CREDENCIALES DE SUPABASE
   const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
   const SUPABASE_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
   
@@ -152,7 +151,6 @@
   let clientesData = [];
   let templatesData = [];
 
-  // 1. Manejo de Sesión / Login
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value;
@@ -183,7 +181,6 @@
     checkUser();
   }
 
-  // 2. Consulta de Datos
   async function cargarDatos() {
     const { data: templates } = await supabaseClient.from('templates').select('*');
     const { data: clientes } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
@@ -210,10 +207,9 @@
       if (c.estado === 'enviado') badgeClass = 'badge-enviado';
       if (c.estado === 'error') badgeClass = 'badge-error';
 
-      // Construcción del selector desplegable de plantillas
       let selectOptions = `<option value="">Seleccionar plantilla...</option>`;
       templatesData.forEach(t => {
-        let isSelected = (t.id === c.template_id) ? 'selected' : '';
+        let isSelected = (String(t.id).trim() === String(c.template_id).trim()) ? 'selected' : '';
         selectOptions += `<option value="${t.id}" ${isSelected}>${t.nombre}</option>`;
       });
 
@@ -249,8 +245,14 @@
     });
   }
 
-  // 3. Asignar Plantilla a Cliente
   async function asignarPlantilla(clienteId, templateId) {
+    // 1. Actualizar memoria local inmediatamente
+    const cliente = clientesData.find(c => String(c.id) === String(clienteId));
+    if (cliente) {
+      cliente.template_id = templateId;
+    }
+
+    // 2. Persistir en Supabase
     const { error } = await supabaseClient
       .from('clientes')
       .update({ template_id: templateId })
@@ -261,9 +263,8 @@
     }
   }
 
-  // 4. Enviar Correo (Abre el cliente de correo con las variables reemplazadas)
   async function enviarMail(clienteId) {
-    const cliente = clientesData.find(c => c.id === clienteId);
+    const cliente = clientesData.find(c => String(c.id) === String(clienteId));
     if (!cliente) return;
 
     if (!cliente.template_id) {
@@ -271,26 +272,21 @@
       return;
     }
 
-    const template = templatesData.find(t => t.id === cliente.template_id);
+    const template = templatesData.find(t => String(t.id) === String(cliente.template_id));
     if (!template) {
       alert("La plantilla seleccionada no existe.");
       return;
     }
 
-    // Reemplazar variables {{nombre}} y {{pedido}}
     let asunto = encodeURIComponent(template.nombre.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || ''));
     let cuerpo = encodeURIComponent(template.cuerpo.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || ''));
 
-    // Actualizar estado a enviado en Supabase
     await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
 
-    // Abrir cliente de mail (Outlook/Gmail)
     window.location.href = `mailto:${cliente.mail}?subject=${asunto}&body=${cuerpo}`;
-
     cargarDatos();
   }
 
-  // 5. Crear Cliente
   async function guardarCliente() {
     const nombre = document.getElementById('newNombre').value;
     const pedido = document.getElementById('newPedido').value;
@@ -311,9 +307,8 @@
     }
   }
 
-  // 6. Crear Plantilla
   async function guardarTemplate() {
-    const id = document.getElementById('tplId').value;
+    const id = document.getElementById('tplId').value.trim();
     const nombre = document.getElementById('tplNombre').value;
     const cuerpo = document.getElementById('tplCuerpo').value;
 
@@ -331,7 +326,6 @@
     }
   }
 
-  // 7. Eliminar Cliente
   async function eliminarCliente(id) {
     if (confirm("¿Estás seguro de eliminar este registro?")) {
       await supabaseClient.from('clientes').delete().eq('id', id);
@@ -352,3 +346,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+ 
+  
+
