@@ -148,6 +148,14 @@
   
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // 2. CONFIGURACIÓN DE EMAILJS (AQUÍ REEMPLAZÁS TUS CLAVES REALES)
+  const EMAILJS_SERVICE_ID = "template_s8suav5";    // El ID de tu Email Service en EmailJS
+  const EMAILJS_TEMPLATE_ID = "service_n9o55gp";  // El ID de tu Email Template
+  const EMAILJS_PUBLIC_KEY = "dMP4M9-N0dQmfzrI5";            // Tu Public Key de Account > API Keys
+
+  // Inicializar EmailJS
+  emailjs.init(EMAILJS_PUBLIC_KEY);
+  
   let clientesData = [];
   let templatesData = [];
 
