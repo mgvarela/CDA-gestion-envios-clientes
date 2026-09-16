@@ -121,30 +121,110 @@
         </div>
       </section>
 
-      <!-- 3. SECCIÓN: ADMIN INTERNO -->
-      <section id="secAdmin" class="seccion-app d-none">
-        <h2 class="mb-4"><i class="bi bi-shield-check text-success"></i> Panel Admin Interno</h2>
-        <div class="row g-3">
-          <div class="col-md-4">
-            <div class="card p-3 border-start border-primary border-4">
-              <h5>Campañas Activas</h5>
-              <p class="fs-2 fw-bold text-primary mb-0">3</p>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="card p-3 border-start border-success border-4">
-              <h5>Promociones Bancarias</h5>
-              <p class="fs-2 fw-bold text-success mb-0">6 Cuotas</p>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="card p-3 border-start border-warning border-4">
-              <h5>Novedades Operativas</h5>
-              <p class="fs-6 text-dark mt-2 mb-0">Funcionamiento normal.</p>
-            </div>
-          </div>
+    <!-- SECCIÓN: ADMIN INTERNO (Promos & Novedades) -->
+<section id="secAdmin" class="seccion-app d-none">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-speedometer2 text-primary"></i> Dashboard de Promociones & Operaciones</h2>
+    <button class="btn btn-primary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i> Actualizar Dashboard</button>
+  </div>
+
+  <!-- Indicadores KPI Rápidos -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card p-3 bg-dark text-white border-start border-success border-4">
+        <small class="text-muted text-uppercase fw-bold">Promos Activas</small>
+        <h3 class="mb-0 text-success fw-bold" id="kpiPromosActivas">0</h3>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card p-3 bg-dark text-white border-start border-danger border-4">
+        <small class="text-muted text-uppercase fw-bold">Promos Inactivas</small>
+        <h3 class="mb-0 text-danger fw-bold" id="kpiPromosInactivas">0</h3>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card p-3 bg-dark text-white border-start border-warning border-4">
+        <small class="text-muted text-uppercase fw-bold">Promos Bancarias</small>
+        <h3 class="mb-0 text-warning fw-bold" id="kpiPromosBancarias">0</h3>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card p-3 bg-dark text-white border-start border-info border-4">
+        <small class="text-muted text-uppercase fw-bold">Novedades Operativas</small>
+        <h3 class="mb-0 text-info fw-bold" id="kpiNovedades">0</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-pestañas para navegar entre Promos Web, Bancarias y Novedades -->
+  <ul class="nav nav-pills mb-3" id="adminTabs" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active" id="tab-promos" data-bs-toggle="pill" data-bs-target="#content-promos">📢 Promociones Web</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-bancarias" data-bs-toggle="pill" data-bs-target="#content-bancarias">🏦 Promos Bancarias</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-novedades" data-bs-toggle="pill" data-bs-target="#content-novedades">🚚 Novedades Operativas</button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- 1. Tabla de Promos Web -->
+    <div class="tab-pane fade show active" id="content-promos">
+      <div class="card p-3">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th><th>Promo</th><th>Inicio</th><th>Fin</th><th>Landing</th><th>Canal</th><th>Observaciones</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tblAdminPromos">
+              <tr><td colspan="8" class="text-center py-3">Cargando promociones...</td></tr>
+            </tbody>
+          </table>
         </div>
-      </section>
+      </div>
+    </div>
+
+    <!-- 2. Tabla de Promos Bancarias -->
+    <div class="tab-pane fade" id="content-bancarias">
+      <div class="card p-3">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th><th>Banco</th><th>Descuento</th><th>Cuotas</th><th>Vigencia</th><th>Alcance</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tblAdminBancarias">
+              <tr><td colspan="7" class="text-center py-3">Cargando convenios bancarios...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Tabla de Novedades Operativas -->
+    <div class="tab-pane fade" id="content-novedades">
+      <div class="card p-3">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th><th>Categoría</th><th>Descripción</th><th>Activa</th>
+              </tr>
+            </thead>
+            <tbody id="tblAdminNovedades">
+              <tr><td colspan="4" class="text-center py-3">Cargando novedades...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
       <!-- 4. SECCIÓN: ARREPENTIMIENTO -->
       <section id="secArrepentimiento" class="seccion-app d-none">
@@ -223,7 +303,10 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="app.js"></script>
+<!-- Scripts Modulares -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/envios.js"></script>
+  <script src="js/admin.js"></script>
 </body>
 </html>
