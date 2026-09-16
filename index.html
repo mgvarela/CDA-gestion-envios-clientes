@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel de Control Multisección</title>
   
-  <!-- CSS Externos -->
+  <!-- CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
   <link rel="stylesheet" href="styles.css">
@@ -16,145 +16,214 @@
 </head>
 <body>
 
-  <!-- Pantalla de Login -->
-  <div id="loginSection" class="auth-container">
-    <div class="card p-4">
-      <h3 class="text-center mb-3"><i class="bi bi-shield-lock text-primary"></i> Acceso al System</h3>
-      <form id="loginForm">
-        <div class="mb-3">
-          <label class="form-label">Email</label>
-          <input type="email" id="loginEmail" class="form-control" required placeholder="admin@empresa.com">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Contraseña</label>
-          <input type="password" id="loginPassword" class="form-control" required>
-        </div>
-        <button type="submit" class="btn btn-primary w-100">Ingresar</button>
-      </form>
-    </div>
+<!-- Pantalla de Login -->
+<div id="loginSection" class="auth-container">
+  <div class="card p-4">
+    <h3 class="text-center mb-3"><i class="bi bi-lock text-primary"></i> Iniciar Sesión</h3>
+    <form id="loginForm">
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" id="loginEmail" class="form-control" required placeholder="tu@email.com">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Contraseña</label>
+        <input type="password" id="loginPassword" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+    </form>
   </div>
+</div>
 
-  <!-- Layout Principal -->
-  <div id="appSection" class="container-fluid d-none">
-    <div class="row">
-      
-      <!-- Sidebar / Navegación -->
-      <nav class="col-md-3 col-lg-2 d-md-block sidebar p-3">
-        <h5 class="text-white mb-4 ps-2"><i class="bi bi-speedometer2 me-2"></i> Control Hub</h5>
-        <ul class="nav flex-column">
-          <li class="nav-item">
-            <a class="nav-link active" href="#" onclick="navegar('secEnvios', this)">
-              <i class="bi bi-truck me-2"></i> Envíos y Pedidos
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" onclick="navegar('secReviews', this)">
-              <i class="bi bi-star-fill me-2"></i> Solicitar Reviews
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" onclick="navegar('secAdmin', this)">
-              <i class="bi bi-pie-chart me-2"></i> Admin Interno
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" onclick="navegar('secArrepentimiento', this)">
-              <i class="bi bi-arrow-counterclockwise me-2"></i> Arrepentimiento
-            </a>
-          </li>
-        </ul>
-        <hr class="text-secondary">
-        <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</button>
-      </nav>
+<!-- Layout Principal -->
+<div id="appSection" class="container-fluid d-none p-0">
+  <div class="row g-0">
+    
+    <!-- Sidebar / Navegación -->
+    <nav class="col-md-3 col-lg-2 sidebar p-3">
+      <h5 class="text-white mb-4 ps-2"><i class="bi bi-speedometer2 me-2"></i> Control Hub</h5>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a class="nav-link active" href="#" onclick="navegar('secEnvios', this)">
+            <i class="bi bi-truck me-2"></i> Envíos y Pedidos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="navegar('secReviews', this)">
+            <i class="bi bi-star-fill me-2"></i> Solicitar Reviews
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="navegar('secAdmin', this)">
+            <i class="bi bi-pie-chart me-2"></i> Admin Interno
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="navegar('secArrepentimiento', this)">
+            <i class="bi bi-arrow-counterclockwise me-2"></i> Arrepentimiento
+          </a>
+        </li>
+      </ul>
+      <hr class="text-secondary">
+      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
+    </nav>
 
-      <!-- Main Content -->
-      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+    <!-- Main Content -->
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
 
-        <!-- 1. Envíos -->
-        <section id="secEnvios" class="seccion-app">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Pedidos y Envíos</h2>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-plus-lg"></i> Nuevo Cliente</button>
+      <!-- 1. SECCIÓN: GESTIÓN DE PEDIDOS Y ENVÍOS (COMPLETA RESTAURADA) -->
+      <section id="secEnvios" class="seccion-app">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
+          <div>
+            <button class="btn btn-outline-secondary me-2" onclick="cargarDatos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-person-plus"></i> Nuevo Cliente</button>
+            <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalTemplates"><i class="bi bi-file-earmark-code"></i> Plantillas</button>
           </div>
-          <div class="card p-3 mb-3">
-            <input type="text" id="searchInput" class="form-control" placeholder="Buscar..." onkeyup="filtrarTabla()">
+        </div>
+
+        <div class="card p-3 mb-4">
+          <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+              <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre, pedido o correo..." onkeyup="filtrarTabla()">
+            </div>
           </div>
-          <div class="card p-3">
+        </div>
+
+        <div class="card p-3">
+          <div class="table-responsive">
             <table class="table table-hover align-middle">
-              <thead>
-                <tr><th>Cliente</th><th>Pedido</th><th>Mail</th><th>Plantilla</th><th>Acción</th><th>Estado</th></tr>
+              <thead class="table-light">
+                <tr>
+                  <th>Nombre</th>
+                  <th>Pedido</th>
+                  <th>Mail</th>
+                  <th width="240">Plantilla Asignada</th>
+                  <th>Enviar</th>
+                  <th>Estado</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
               </thead>
               <tbody id="tableBody">
-                <tr><td colspan="6" class="text-center py-3">Cargando envíos...</td></tr>
+                <tr><td colspan="7" class="text-center py-4">Cargando datos...</td></tr>
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <!-- 2. Reviews -->
-        <section id="secReviews" class="seccion-app d-none">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2><i class="bi bi-star text-warning"></i> Solicitud de Reviews</h2>
-          </div>
-          <div class="card p-3">
-            <table class="table table-hover align-middle">
-              <thead>
-                <tr><th>Cliente</th><th>Producto</th><th>Mail</th><th>Estado</th><th>Acción</th></tr>
-              </thead>
-              <tbody id="tableBodyReviews">
-                <tr><td colspan="5" class="text-center py-3">Sin solicitudes de review pendientes.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+      <!-- 2. SECCIÓN: REVIEWS -->
+      <section id="secReviews" class="seccion-app d-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2><i class="bi bi-star text-warning"></i> Solicitud de Reviews</h2>
+        </div>
+        <div class="card p-3">
+          <p class="text-muted mb-0">Módulo de gestión para envíos post-venta tipo Mercado Libre.</p>
+        </div>
+      </section>
 
-        <!-- 3. Admin Interno -->
-        <section id="secAdmin" class="seccion-app d-none">
-          <h2 class="mb-4"><i class="bi bi-shield-check text-success"></i> Panel Admin Interno</h2>
-          <div class="row g-3">
-            <div class="col-md-4">
-              <div class="card p-3 border-start border-primary border-4">
-                <h5>Campañas Activas</h5>
-                <p class="fs-2 fw-bold text-primary mb-0">3</p>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="card p-3 border-start border-success border-4">
-                <h5>Promociones Bancarias</h5>
-                <p class="fs-2 fw-bold text-success mb-0">6 Cuotas</p>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="card p-3 border-start border-warning border-4">
-                <h5>Novedades Operativas</h5>
-                <p class="fs-6 text-dark mt-2 mb-0">Normal funcionamiento de depósitos.</p>
-              </div>
+      <!-- 3. SECCIÓN: ADMIN INTERNO -->
+      <section id="secAdmin" class="seccion-app d-none">
+        <h2 class="mb-4"><i class="bi bi-shield-check text-success"></i> Panel Admin Interno</h2>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="card p-3 border-start border-primary border-4">
+              <h5>Campañas Activas</h5>
+              <p class="fs-2 fw-bold text-primary mb-0">3</p>
             </div>
           </div>
-        </section>
-
-        <!-- 4. Botón de Arrepentimiento -->
-        <section id="secArrepentimiento" class="seccion-app d-none">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2><i class="bi bi-arrow-counterclockwise text-danger"></i> Solicitudes de Arrepentimiento</h2>
+          <div class="col-md-4">
+            <div class="card p-3 border-start border-success border-4">
+              <h5>Promociones Bancarias</h5>
+              <p class="fs-2 fw-bold text-success mb-0">6 Cuotas</p>
+            </div>
           </div>
-          <div class="card p-3">
-            <table class="table table-hover align-middle">
-              <thead>
-                <tr><th>Fecha</th><th>Cliente</th><th>Pedido</th><th>Motivo</th><th>Estado</th></tr>
-              </thead>
-              <tbody id="tableBodyArrepentimiento">
-                <tr><td colspan="5" class="text-center py-3">Sin registros.</td></tr>
-              </tbody>
-            </table>
+          <div class="col-md-4">
+            <div class="card p-3 border-start border-warning border-4">
+              <h5>Novedades Operativas</h5>
+              <p class="fs-6 text-dark mt-2 mb-0">Funcionamiento normal.</p>
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-      </main>
+      <!-- 4. SECCIÓN: ARREPENTIMIENTO -->
+      <section id="secArrepentimiento" class="seccion-app d-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2><i class="bi bi-arrow-counterclockwise text-danger"></i> Solicitudes de Arrepentimiento</h2>
+        </div>
+        <div class="card p-3">
+          <p class="text-muted mb-0">Módulo de botón de arrepentimiento y bajas de compra.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO CLIENTE -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Agregar Nuevo Cliente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formCliente">
+          <div class="mb-3">
+            <label class="form-label">Nombre del Cliente</label>
+            <input type="text" id="newNombre" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Detalle del Pedido</label>
+            <input type="text" id="newPedido" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo Electrónico</label>
+            <input type="email" id="newMail" class="form-control" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarCliente()">Guardar</button>
+      </div>
     </div>
   </div>
+</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="app.js"></script>
+<!-- MODAL: PLANTILLAS DE CORREO -->
+<div class="modal fade" id="modalTemplates" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Plantillas de Correo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formTemplate" class="mb-4">
+          <h6>Nueva Plantilla</h6>
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <input type="text" id="tplId" class="form-control" placeholder="ID (ej: tpl_envio)" required>
+            </div>
+            <div class="col-md-8">
+              <input type="text" id="tplNombre" class="form-control" placeholder="Asunto del mail" required>
+            </div>
+          </div>
+          <div class="mb-2">
+            <textarea id="tplCuerpo" class="form-control" rows="3" placeholder="Cuerpo del correo. Podés usar {{nombre}} y {{pedido}}" required></textarea>
+          </div>
+          <button type="button" class="btn btn-sm btn-dark" onclick="guardarTemplate()">Guardar Plantilla</button>
+        </form>
+        <h6>Plantillas Registradas</h6>
+        <ul class="list-group" id="listTemplates"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
