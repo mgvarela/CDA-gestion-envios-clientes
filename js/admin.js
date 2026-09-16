@@ -411,7 +411,7 @@ async function cargarUsuariosRoles() {
 
   const { data: perfiles, error } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false });
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">No se pudieron cargar los permisos.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">No se pudieron cargar los permisos: ${escapeHtml(error.message)}</td></tr>`;
     console.error(error);
     return;
   }
@@ -419,7 +419,7 @@ async function cargarUsuariosRoles() {
   tbody.innerHTML = '';
 
   if (!perfiles || perfiles.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3">Sin usuarios registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3">Sin usuarios registrados.</td></tr>';
     return;
   }
 
@@ -427,6 +427,7 @@ async function cargarUsuariosRoles() {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td><strong>${usuario.id ? usuario.id.slice(0, 8) : '-'}</strong></td>
+      <td>${escapeHtml(usuario.email || '-')}</td>
       <td>${usuario.role || 'viewer'}</td>
       <td>
         <select class="form-select form-select-sm" data-user-role-select="${usuario.id}">
