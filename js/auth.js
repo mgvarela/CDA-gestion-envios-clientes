@@ -1,6 +1,4 @@
-// ==========================================
-// CONFIGURACIÓN CENTRAL DE SUPABASE Y EMAILJS
-// ==========================================
+// CONFIGURACIÓN CENTRAL DE APIS
 const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
 const SUPABASE_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
 
@@ -14,36 +12,59 @@ if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
   emailjs.init(EMAILJS_PUBLIC_KEY);
 }
 
-// ==========================================
-// NAVEGACIÓN ENTRE SECCIONES
-// ==========================================
-function navegar(idSeccion, elementoLink) {
-  document.querySelectorAll('.seccion-app').forEach(sec => sec.classList.add('d-none'));
+// NAVEGACIÓN Y CARGA DINÁMICA DE VISTAS
+async function navegar(seccion, elementoLink) {
   document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
-  
-  document.getElementById(idSeccion).classList.remove('d-none');
-  elementoLink.classList.add('active');
+  if (elementoLink) elementoLink.classList.add('active');
 
-  // Carga condicional al cambiar de pestaña
-  if (idSeccion === 'secAdmin' && typeof cargarDatosAdmin === 'function') {
-    cargarDatosAdmin();
+  const mainContent = document.getElementById('mainContent');
+  mainContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando...</p></div>`;
+
+  try {
+    const resView = await fetch(`views/${seccion}.html`);
+    if (!resView.ok) throw new Error("Error al cargar la vista.");
+    mainContent.innerHTML = await resView.text();
+
+    // Cargar modales asociados
+    cargarModales();
+
+    // Disparar carga de datos según sección
+    if (seccion === 'envios' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
+    if (seccion === 'admin' && typeof cargarDatosAdmin === 'function') cargarDatosAdmin();
+
+  } catch (err) {
+    mainContent.innerHTML = `<div class="alert alert-danger m-4">No se pudo cargar la sección. ${err.message}</div>`;
   }
 }
 
-// ==========================================
-// CONTROL DE AUTENTICACIÓN
-// ==========================================
+// CARGA DE COMPONENTES MODALES
+async function cargarModales() {
+  const container = document.getElementById('modalsContainer');
+  if (!container) return;
+
+  try {
+    const [mCliente, mTemplates, mPromo] = await Promise.all([
+      fetch('modals/modal-cliente.html').then(r => r.text()),
+      fetch('modals/modal-novedad.html').then(r => r.text()),
+      fetch('modals/modal-promo-bancaria.html').then(r => r.text()),
+      fetch('modals/modal-promo.html').then(r => r.text()),
+      fetch('modals/modal-templates.html').then(r => r.text())
+    ]);
+    container.innerHTML = mCliente + mTemplates + mPromo;
+  } catch (err) {
+    console.error("Error al cargar modales:", err);
+  }
+}
+
+// MANEJO DE SESIÓN
 document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) {
-    alert("Error al ingresar: " + error.message);
-  } else {
-    checkUser();
-  }
+  if (error) alert("Error al ingresar: " + error.message);
+  else checkUser();
 });
 
 async function checkUser() {
@@ -51,10 +72,7 @@ async function checkUser() {
   if (session) {
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
-    
-    // Carga inicial de datos tras el login
-    if (typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
-    if (typeof cargarDatosAdmin === 'function') cargarDatosAdmin();
+    navegar('envios', document.querySelector('.sidebar .nav-link.active'));
   } else {
     document.getElementById('loginSection').classList.remove('d-none');
     document.getElementById('appSection').classList.add('d-none');

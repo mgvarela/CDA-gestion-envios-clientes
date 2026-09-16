@@ -1,0 +1,29 @@
+<div class="modal fade" id="modalTemplates" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Plantillas de Correo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formTemplate" class="mb-4">
+          <h6>Nueva Plantilla</h6>
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <input type="text" id="tplId" class="form-control" placeholder="ID (ej: tpl_envio)" required>
+            </div>
+            <div class="col-md-8">
+              <input type="text" id="tplNombre" class="form-control" placeholder="Asunto del mail" required>
+            </div>
+          </div>
+          <div class="mb-2">
+            <textarea id="tplCuerpo" class="form-control" rows="3" placeholder="Cuerpo del correo con {{nombre}} y {{pedido}}" required></textarea>
+          </div>
+          <button type="button" class="btn btn-sm btn-dark" onclick="guardarTemplate()">Guardar Plantilla</button>
+        </form>
+        <h6>Plantillas Registradas</h6>
+        <ul class="list-group" id="listTemplates"></ul>
+      </div>
+    </div>
+  </div>
+</div>

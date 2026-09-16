@@ -1,0 +1,44 @@
+<div class="modal fade" id="modalNuevaPromo" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle text-primary me-2"></i>Nueva Promoción Web</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formNuevaPromo">
+          <div class="mb-3">
+            <label class="form-label">ID Promo</label>
+            <input type="text" id="pId" class="form-control" placeholder="P004" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nombre de la Promo</label>
+            <input type="text" id="pNombre" class="form-control" placeholder="CyberMonday" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Fecha Inicio</label>
+              <input type="datetime-local" id="pInicio" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Fecha Fin</label>
+              <input type="datetime-local" id="pFin" class="form-control" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Landing URL</label>
+            <input type="url" id="pLanding" class="form-control" placeholder="https://casadelaudio.com/..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Observaciones</label>
+            <textarea id="pObs" class="form-control" rows="2" placeholder="Hasta 40% OFF y 6 cuotas"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarNuevaPromo()">Guardar Promo</button>
+      </div>
+    </div>
+  </div>
+</div>

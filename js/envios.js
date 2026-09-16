@@ -1,7 +1,6 @@
 let clientesData = [];
 let templatesData = [];
 
-// Carga inicial de datos de envíos y plantillas
 async function cargarDatosEnvios() {
   const { data: templates } = await supabaseClient.from('templates').select('*');
   const { data: clientes } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
@@ -72,20 +71,13 @@ async function asignarPlantilla(clienteId, templateId) {
   const cliente = clientesData.find(c => String(c.id) === String(clienteId));
   if (cliente) cliente.template_id = templateId;
 
-  const { error } = await supabaseClient
-    .from('clientes')
-    .update({ template_id: templateId })
-    .eq('id', clienteId);
-
+  const { error } = await supabaseClient.from('clientes').update({ template_id: templateId }).eq('id', clienteId);
   if (error) alert("Error al asignar plantilla: " + error.message);
 }
 
 async function enviarMail(clienteId) {
   const cliente = clientesData.find(c => String(c.id) === String(clienteId));
-  if (!cliente || !cliente.template_id) {
-    alert("Por favor, selecciona una plantilla para este cliente.");
-    return;
-  }
+  if (!cliente || !cliente.template_id) return alert("Por favor, selecciona una plantilla.");
 
   const template = templatesData.find(t => String(t.id) === String(cliente.template_id));
   if (!template) return;
@@ -120,9 +112,8 @@ async function guardarCliente() {
   if (!nombre || !mail) return alert('Nombre y correo son requeridos.');
 
   const { error } = await supabaseClient.from('clientes').insert([{ nombre, pedido, mail, estado: 'sin aviso' }]);
-  if (error) {
-    alert("Error al guardar: " + error.message);
-  } else {
+  if (error) alert("Error al guardar: " + error.message);
+  else {
     bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
     document.getElementById('formCliente').reset();
     cargarDatosEnvios();
@@ -137,9 +128,8 @@ async function guardarTemplate() {
   if (!id || !nombre || !cuerpo) return alert('Todos los campos son obligatorios.');
 
   const { error } = await supabaseClient.from('templates').insert([{ id, nombre, cuerpo }]);
-  if (error) {
-    alert("Error al guardar plantilla: " + error.message);
-  } else {
+  if (error) alert("Error al guardar plantilla: " + error.message);
+  else {
     document.getElementById('formTemplate').reset();
     cargarDatosEnvios();
   }

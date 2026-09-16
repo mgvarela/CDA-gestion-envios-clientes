@@ -1,0 +1,30 @@
+<div class="modal fade" id="modalCliente" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Agregar Nuevo Cliente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formCliente">
+          <div class="mb-3">
+            <label class="form-label">Nombre del Cliente</label>
+            <input type="text" id="newNombre" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Detalle del Pedido</label>
+            <input type="text" id="newPedido" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo Electrónico</label>
+            <input type="email" id="newMail" class="form-control" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarCliente()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>

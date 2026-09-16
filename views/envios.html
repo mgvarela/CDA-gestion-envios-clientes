@@ -1,0 +1,27 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
+  <div>
+    <button class="btn btn-outline-secondary me-2 btn-sm" onclick="cargarDatosEnvios()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+    <button class="btn btn-primary me-2 btn-sm" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-person-plus"></i> Nuevo Cliente</button>
+    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalTemplates"><i class="bi bi-file-earmark-code"></i> Plantillas</button>
+  </div>
+</div>
+
+<div class="card p-3 mb-4">
+  <input type="text" id="searchInput" class="form-control" placeholder="Buscar..." onkeyup="filtrarTabla()">
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Nombre</th><th>Pedido</th><th>Mail</th><th width="240">Plantilla</th><th>Enviar</th><th>Estado</th><th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="7" class="text-center py-4">Cargando datos...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

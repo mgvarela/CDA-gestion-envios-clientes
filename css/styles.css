@@ -38,3 +38,28 @@ body {
   max-width: 400px; 
   margin: 80px auto; 
 }
+
+/* Adaptabilidad Móvil */
+@media (max-width: 767.98px) {
+  .sidebar {
+    min-height: auto !important;
+    padding: 1rem !important;
+  }
+
+  main {
+    padding: 1rem !important;
+  }
+
+  .table-responsive {
+    font-size: 0.85rem;
+  }
+
+  .nav-pills .nav-link {
+    text-align: center;
+    margin-bottom: 6px;
+  }
+
+  .card h3 {
+    font-size: 1.4rem;
+  }
+}

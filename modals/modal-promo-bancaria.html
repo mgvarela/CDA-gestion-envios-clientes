@@ -1,0 +1,29 @@
+<div class="modal fade" id="modalNuevaPromoBancaria" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bank text-primary me-2"></i>Nueva Promo Bancaria</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formNuevaPromoBancaria">
+          <div class="mb-2"><label class="form-label">ID Promo</label><input type="text" id="pbId" class="form-control" placeholder="PB009" required></div>
+          <div class="mb-2"><label class="form-label">Banco</label><input type="text" id="pbBanco" class="form-control" placeholder="Banco Galicia" required></div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label">Descuento</label><input type="text" id="pbDescuento" class="form-control" placeholder="15% OFF"></div>
+            <div class="col-6"><label class="form-label">Cuotas</label><input type="text" id="pbCuotas" class="form-control" placeholder="6, 12"></div>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label">Inicio</label><input type="date" id="pbInicio" class="form-control"></div>
+            <div class="col-6"><label class="form-label">Fin</label><input type="date" id="pbFin" class="form-control"></div>
+          </div>
+          <div class="mb-2"><label class="form-label">Alcance</label><input type="text" id="pbAlcance" class="form-control" value="web"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarNuevaPromoBancaria()">Guardar Convenio</button>
+      </div>
+    </div>
+  </div>
+</div>
