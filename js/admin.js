@@ -37,6 +37,8 @@ function mostrarPanelUsuarios() {
   cargarUsuariosRoles();
 }
 
+window.mostrarPanelUsuarios = mostrarPanelUsuarios;
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
