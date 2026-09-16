@@ -6,25 +6,25 @@
 <!-- Tarjetas KPI -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card p-3 bg-dark text-white border-start border-success border-4">
+    <div class="card p-3 bg-secondary text-white border-start border-success border-4">
       <small class="text-muted text-uppercase fw-bold">Promos Activas</small>
       <h3 class="mb-0 text-success fw-bold" id="kpiPromosActivas">0</h3>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card p-3 bg-dark text-white border-start border-danger border-4">
+    <div class="card p-3 bg-secondary text-white border-start border-danger border-4">
       <small class="text-muted text-uppercase fw-bold">Promos Inactivas</small>
       <h3 class="mb-0 text-danger fw-bold" id="kpiPromosInactivas">0</h3>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card p-3 bg-dark text-white border-start border-warning border-4">
+    <div class="card p-3 bg-secondary text-white border-start border-warning border-4">
       <small class="text-muted text-uppercase fw-bold">Promos Bancarias</small>
       <h3 class="mb-0 text-warning fw-bold" id="kpiPromosBancarias">0</h3>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card p-3 bg-dark text-white border-start border-info border-4">
+    <div class="card p-3 bg-secondary text-white border-start border-info border-4">
       <small class="text-muted text-uppercase fw-bold">Novedades</small>
       <h3 class="mb-0 text-info fw-bold" id="kpiNovedades">0</h3>
     </div>
@@ -51,8 +51,8 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Listado de Promociones</h5>
         <div>
-          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('promos')"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromo"><i class="bi bi-plus-lg"></i> Nueva Promo</button>
+          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('promos')" data-role-action="write" id="btnEnviarPromos"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
+          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromo" data-role-action="write" id="btnNuevaPromo"><i class="bi bi-plus-lg"></i> Nueva Promo</button>
         </div>
       </div>
       <div class="table-responsive">
@@ -75,8 +75,8 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Listado de Convenios Bancarios</h5>
         <div>
-          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('bancarias')"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromoBancaria"><i class="bi bi-plus-lg"></i> Nueva Promo Bancaria</button>
+          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('bancarias')" data-role-action="write" id="btnEnviarBancarias"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
+          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromoBancaria" data-role-action="write" id="btnNuevaPromoBancaria"><i class="bi bi-plus-lg"></i> Nueva Promo Bancaria</button>
         </div>
       </div>
       <div class="table-responsive">
@@ -99,8 +99,8 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Novedades y Medios de Pago</h5>
         <div>
-          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('novedades')"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaNovedad"><i class="bi bi-plus-lg"></i> Nueva Novedad</button>
+          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('novedades')" data-role-action="write" id="btnEnviarNovedades"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
+          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaNovedad" data-role-action="write" id="btnNuevaNovedad"><i class="bi bi-plus-lg"></i> Nueva Novedad</button>
         </div>
       </div>
       <div class="table-responsive">
@@ -116,4 +116,33 @@
       </div>
     </div>
   </div>
+
+  <!-- 4. GESTIÓN DE USUARIOS Y PERMISOS -->
+  <div class="tab-pane fade" id="content-usuarios">
+    <div class="card p-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h5 class="mb-0">Permisos de Usuarios</h5>
+        <button class="btn btn-outline-primary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>ID de Usuario</th>
+              <th>Rol Actual</th>
+              <th>Nuevo Rol</th>
+              <th class="text-end">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tblUsuariosPermisos"><tr><td colspan="4" class="text-center py-3">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4 d-flex justify-content-end">
+  <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="pill" data-bs-target="#content-usuarios" id="tab-usuarios" data-admin-only="true">
+    <i class="bi bi-shield-lock"></i> Usuarios / Permisos
+  </button>
 </div>

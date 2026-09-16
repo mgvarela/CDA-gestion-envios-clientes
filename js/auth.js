@@ -7,6 +7,72 @@ const EMAILJS_TEMPLATE_ID = "template_s8suav5";
 const EMAILJS_PUBLIC_KEY = "kyyRWVy91lz7Wqh0Y";            
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentUserRole = 'viewer';
+
+function canWrite() {
+  return ['admin', 'editor'].includes(currentUserRole);
+}
+
+function canDelete() {
+  return currentUserRole === 'admin';
+}
+
+function applyRolePermissions() {
+  const canWriteAction = canWrite();
+  const canDeleteAction = canDelete();
+  const roleBadge = document.getElementById('currentUserRoleLabel');
+
+  if (roleBadge) {
+    roleBadge.textContent = currentUserRole;
+  }
+
+  document.querySelectorAll('[data-role-action="write"]').forEach(el => {
+    el.hidden = !canWriteAction;
+  });
+
+  document.querySelectorAll('[data-role-action="delete"]').forEach(el => {
+    el.hidden = !canDeleteAction;
+  });
+
+  const adminOnlyEls = document.querySelectorAll('[data-admin-only="true"]');
+  adminOnlyEls.forEach(el => {
+    el.hidden = currentUserRole !== 'admin';
+  });
+}
+
+async function loadUserRole() {
+  const { data: { session }, error } = await supabaseClient.auth.getSession();
+  if (error || !session) {
+    currentUserRole = 'viewer';
+    applyRolePermissions();
+    return;
+  }
+
+  const { data, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .maybeSingle();
+
+  currentUserRole = (!profileError && data?.role) ? data.role : 'viewer';
+  applyRolePermissions();
+}
+
+async function requireAuth() {
+  const { data: { session }, error } = await supabaseClient.auth.getSession();
+
+  if (error || !session) {
+    alert('Tu sesión expiró o no estás autenticado. Iniciá sesión nuevamente.');
+    const loginSection = document.getElementById('loginSection');
+    const appSection = document.getElementById('appSection');
+    if (loginSection) loginSection.classList.remove('d-none');
+    if (appSection) appSection.classList.add('d-none');
+    return false;
+  }
+
+  await loadUserRole();
+  return true;
+}
 
 if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
   emailjs.init(EMAILJS_PUBLIC_KEY);
@@ -27,6 +93,7 @@ async function navegar(seccion, elementoLink) {
 
     // Cargar modales asociados
     cargarModales();
+    applyRolePermissions();
 
     // Disparar carga de datos según sección
     if (seccion === 'envios' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
@@ -43,14 +110,14 @@ async function cargarModales() {
   if (!container) return;
 
   try {
-    const [mCliente, mTemplates, mPromo] = await Promise.all([
+    const [mCliente, mNovedad, mPromoBancaria, mPromo, mTemplates] = await Promise.all([
       fetch('modals/modal-cliente.html').then(r => r.text()),
       fetch('modals/modal-novedad.html').then(r => r.text()),
       fetch('modals/modal-promo-bancaria.html').then(r => r.text()),
       fetch('modals/modal-promo.html').then(r => r.text()),
       fetch('modals/modal-templates.html').then(r => r.text())
     ]);
-    container.innerHTML = mCliente + mTemplates + mPromo;
+    container.innerHTML = mCliente + mNovedad + mPromoBancaria + mPromo + mTemplates;
   } catch (err) {
     console.error("Error al cargar modales:", err);
   }
@@ -70,10 +137,12 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
 async function checkUser() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
+    await loadUserRole();
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
     navegar('envios', document.querySelector('.sidebar .nav-link.active'));
   } else {
+    currentUserRole = 'viewer';
     document.getElementById('loginSection').classList.remove('d-none');
     document.getElementById('appSection').classList.add('d-none');
   }

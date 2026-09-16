@@ -1,42 +1,87 @@
-body { 
-  background-color: #f8f9fa; 
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-  padding-bottom: 40px; 
+:root {
+
+  --bs-primary: var(--color-cda-principal);
+  --bs-primary-rgb: 30, 58, 138;
+  --bs-secondary: #475569;
+  --bs-success: #10b981;
+  --bs-danger: #ef4444;
+  --bs-dark: #0f172a;
+  --bs-body-bg: #f8fafc;
+  --bs-card-border-radius: 12px;
+
+  --color-black: #000000;
+  --color-white: #ffffff;
+  --color-cda-principal: #004c8f;
+  --color-blue-dark: #0d1720;
+  --color-red: #ef4444;
 }
 
-.sidebar { 
-  min-height: 100vh; 
-  background-color: #212529; 
-  color: #fff; 
+body {
+  background-color: #f8f9fa;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding-bottom: 40px;
 }
 
-.sidebar .nav-link { 
-  color: #adb5bd; 
-  font-size: 0.95rem; 
-  margin-bottom: 4px; 
+.sidebar {
+  min-height: 100vh;
+  background-color: var(--color-blue-dark);
+  color: var(--color-white);
 }
 
-.sidebar .nav-link:hover, 
-.sidebar .nav-link.active { 
-  color: #fff; 
-  background-color: #0d6efd; 
-  border-radius: 6px; 
+.sidebar .nav-link {
+  color: var(--color-white);
+  font-size: 0.95rem;
+  margin-bottom: 4px;
 }
 
-.card { 
-  border-radius: 12px; 
-  border: none; 
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  color: var(--color-white);
+  background-color: var(--color-cda-principal);
+  border-radius: 6px;
 }
 
-.badge-sin-aviso { background-color: #e2e3e5; color: #41464b; }
-.badge-en-proceso { background-color: #cff4fc; color: #055160; }
-.badge-enviado { background-color: #d1e7dd; color: #0f5132; }
-.badge-error { background-color: #f8d7da; color: #842029; }
+.card {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
 
-.auth-container { 
-  max-width: 400px; 
-  margin: 80px auto; 
+.badge-sin-aviso {
+  background-color: #e2e3e5;
+  color: #41464b;
+}
+
+.badge-en-proceso {
+  background-color: #cff4fc;
+  color: #055160;
+}
+
+.badge-enviado {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+
+.badge-error {
+  background-color: var(--color-red);
+  color: var(--color-white);
+}
+
+.auth-container {
+  max-width: 400px;
+  margin: 80px auto;
+}
+
+/* ADMIN KPI */
+.row.g-3.mb-4 small {
+  color: var(--color-white)
+}
+
+.img-logo {
+  width: 70%;
+  margin: 10px auto 20px;
+  text-align: center;
+  display: flex;
 }
 
 /* Adaptabilidad Móvil */

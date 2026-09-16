@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control Hub - Casa del Audio</title>
+  <title>Control Ecommerce - Casa del Audio</title>
   
   <!-- CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -40,7 +40,10 @@
     
     <!-- Sidebar / Navegación -->
     <nav class="col-md-3 col-lg-2 sidebar p-3">
-      <h5 class="text-white mb-4 ps-2"><i class="bi bi-speedometer2 me-2"></i> Control Hub</h5>
+      <h5 class="text-white mb-4 ps-2"><img class="img-logo" src="css/img/logo_white.png" alt="Control Ecommerce" class="img-fluid">Control Ecommerce</h5>
+      <div class="mb-3 ps-2">
+        <span class="badge bg-light text-dark">Rol: <span id="currentUserRoleLabel">viewer</span></span>
+      </div>
       <ul class="nav flex-column">
         <li class="nav-item">
           <a class="nav-link active" href="#" onclick="navegar('envios', this)">
@@ -64,7 +67,7 @@
         </li>
       </ul>
       <hr class="text-secondary">
-      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
+      <button class="btn btn-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
     </nav>
 
     <!-- Contenido Principal Dinámico -->

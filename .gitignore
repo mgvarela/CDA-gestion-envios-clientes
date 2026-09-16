@@ -1,0 +1,21 @@
+# Secretos y configuracion local
+.env
+.env.*
+!.env.example
+
+# Claves privadas y certificados
+*.pem
+*.key
+*.crt
+
+# Dependencias y archivos generados
+node_modules/
+dist/
+build/
+coverage/
+
+# Logs y archivos del sistema
+*.log
+.DS_Store
+Thumbs.db
+.vscode/

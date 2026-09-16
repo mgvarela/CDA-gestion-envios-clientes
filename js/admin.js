@@ -1,7 +1,58 @@
 let clientesData = [];
 let templatesData = [];
 
+function isAdminOnlyAction(element) {
+  return element && element.dataset && element.dataset.adminOnly === 'true';
+}
+
+function toggleAdminOnlySections() {
+  const isAdminUser = currentUserRole === 'admin';
+  document.querySelectorAll('[data-admin-only="true"]').forEach(el => {
+    el.hidden = !isAdminUser;
+  });
+}
+
+async function cargarDatosAdmin() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+
+  await Promise.all([
+    cargarPromosWeb(),
+    cargarPromosBancarias(),
+    cargarNovedadesOperativas(),
+    cargarUsuariosRoles()
+  ]);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeText(value, maxLength = 200) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function sanitizeEmail(value) {
+  return sanitizeText(value, 254).toLowerCase();
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
+}
+
+function sanitizeTemplateId(value) {
+  return sanitizeText(value, 80).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 async function cargarDatosEnvios() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+
   const { data: templates } = await supabaseClient.from('templates').select('*');
   const { data: clientes } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
   
@@ -28,33 +79,80 @@ function renderTablaEnvios() {
     if (c.estado === 'enviado') badgeClass = 'badge-enviado';
     if (c.estado === 'error') badgeClass = 'badge-error';
 
-    let selectOptions = `<option value="">Seleccionar plantilla...</option>`;
+    const tr = document.createElement('tr');
+
+    const nombreCell = document.createElement('td');
+    const nombreStrong = document.createElement('strong');
+    nombreStrong.textContent = sanitizeText(c.nombre, 80) || '-';
+    nombreCell.appendChild(nombreStrong);
+    tr.appendChild(nombreCell);
+
+    const pedidoCell = document.createElement('td');
+    pedidoCell.textContent = sanitizeText(c.pedido, 200) || '-';
+    tr.appendChild(pedidoCell);
+
+    const mailCell = document.createElement('td');
+    mailCell.textContent = sanitizeEmail(c.mail) || '-';
+    tr.appendChild(mailCell);
+
+    const selectCell = document.createElement('td');
+    const select = document.createElement('select');
+    select.className = 'form-select form-select-sm';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Seleccionar plantilla...';
+    select.appendChild(placeholder);
+
     templatesData.forEach(t => {
-      let isSelected = (String(t.id).trim() === String(c.template_id).trim()) ? 'selected' : '';
-      selectOptions += `<option value="${t.id}" ${isSelected}>${t.nombre}</option>`;
+      const option = document.createElement('option');
+      option.value = String(t.id);
+      option.textContent = sanitizeText(t.nombre, 80) || 'Plantilla';
+      if (String(t.id).trim() === String(c.template_id).trim()) option.selected = true;
+      select.appendChild(option);
     });
 
-    tbody.innerHTML += `
-      <tr>
-        <td><strong>${c.nombre}</strong></td>
-        <td>${c.pedido || '-'}</td>
-        <td>${c.mail}</td>
-        <td>
-          <select class="form-select form-select-sm" onchange="asignarPlantilla('${c.id}', this.value)">
-            ${selectOptions}
-          </select>
-        </td>
-        <td>
-          <button class="btn btn-sm btn-primary" id="btn-send-${c.id}" onclick="enviarMail('${c.id}')">
-            <i class="bi bi-send"></i> Enviar
-          </button>
-        </td>
-        <td><span class="badge ${badgeClass}" id="badge-${c.id}">${c.estado}</span></td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente('${c.id}')"><i class="bi bi-trash"></i></button>
-        </td>
-      </tr>
-    `;
+    select.addEventListener('change', (event) => {
+      asignarPlantilla(c.id, event.target.value);
+    });
+    selectCell.appendChild(select);
+    tr.appendChild(selectCell);
+
+    const sendCell = document.createElement('td');
+    const sendBtn = document.createElement('button');
+    sendBtn.type = 'button';
+    sendBtn.className = 'btn btn-sm btn-primary';
+    sendBtn.id = `btn-send-${c.id}`;
+    sendBtn.innerHTML = '<i class="bi bi-send"></i> Enviar';
+    sendBtn.disabled = !canWrite();
+    sendBtn.addEventListener('click', () => enviarMail(c.id));
+    sendCell.appendChild(sendBtn);
+    tr.appendChild(sendCell);
+
+    const estadoCell = document.createElement('td');
+    const estadoBadge = document.createElement('span');
+    estadoBadge.className = `badge ${badgeClass}`;
+    estadoBadge.id = `badge-${c.id}`;
+    estadoBadge.textContent = sanitizeText(c.estado, 30) || 'sin aviso';
+    estadoCell.appendChild(estadoBadge);
+    tr.appendChild(estadoCell);
+
+    const accionesCell = document.createElement('td');
+    accionesCell.className = 'text-center';
+
+    if (canDelete()) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn-sm btn-outline-danger';
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.addEventListener('click', () => eliminarCliente(c.id));
+      accionesCell.appendChild(deleteBtn);
+    } else {
+      accionesCell.textContent = '-';
+    }
+
+    tr.appendChild(accionesCell);
+
+    tbody.appendChild(tr);
   });
 }
 
@@ -63,11 +161,37 @@ function renderTemplates() {
   if (!list) return;
   list.innerHTML = '';
   templatesData.forEach(t => {
-    list.innerHTML += `<li class="list-group-item"><strong>${t.nombre}</strong> <small class="text-muted">(${t.id})</small><br><small>${t.cuerpo}</small></li>`;
+    const item = document.createElement('li');
+    item.className = 'list-group-item';
+
+    const title = document.createElement('strong');
+    title.textContent = sanitizeText(t.nombre, 80) || 'Plantilla';
+    item.appendChild(title);
+
+    const meta = document.createElement('small');
+    meta.className = 'text-muted';
+    meta.textContent = ` (${sanitizeText(t.id, 50)})`;
+    item.appendChild(meta);
+
+    const br = document.createElement('br');
+    item.appendChild(br);
+
+    const body = document.createElement('small');
+    body.textContent = sanitizeText(t.cuerpo, 500) || '-';
+    item.appendChild(body);
+
+    list.appendChild(item);
   });
 }
 
 async function asignarPlantilla(clienteId, templateId) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para asignar plantillas.');
+    return;
+  }
+
   const cliente = clientesData.find(c => String(c.id) === String(clienteId));
   if (cliente) cliente.template_id = templateId;
 
@@ -76,24 +200,35 @@ async function asignarPlantilla(clienteId, templateId) {
 }
 
 async function enviarMail(clienteId) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para enviar mails.');
+    return;
+  }
+
   const cliente = clientesData.find(c => String(c.id) === String(clienteId));
   if (!cliente || !cliente.template_id) return alert("Por favor, selecciona una plantilla.");
 
   const template = templatesData.find(t => String(t.id) === String(cliente.template_id));
   if (!template) return;
 
-  const asuntoFinal = template.nombre.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || '');
-  const cuerpoFinal = template.cuerpo.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || '');
+  const nombreCliente = sanitizeText(cliente.nombre, 80);
+  const pedidoCliente = sanitizeText(cliente.pedido || '', 200);
+  const emailDestino = sanitizeEmail(cliente.mail);
+
+  const asuntoFinal = sanitizeText(template.nombre, 150).replace(/\{\{nombre\}\}/g, nombreCliente).replace(/\{\{pedido\}\}/g, pedidoCliente);
+  const cuerpoFinal = sanitizeText(template.cuerpo, 2000).replace(/\{\{nombre\}\}/g, nombreCliente).replace(/\{\{pedido\}\}/g, pedidoCliente);
 
   const btn = document.getElementById(`btn-send-${clienteId}`);
   if (btn) btn.disabled = true;
 
   try {
-    const params = { email_destino: cliente.mail, asunto: asuntoFinal, mensaje: cuerpoFinal };
+    const params = { email_destino: emailDestino, asunto: asuntoFinal, mensaje: cuerpoFinal };
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
     await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
     
-    alert(`📧 Mail enviado con éxito a ${cliente.mail}`);
+    alert(`📧 Mail enviado con éxito a ${emailDestino}`);
     cargarDatosEnvios();
   } catch (err) {
     alert("❌ Error al enviar mail: " + JSON.stringify(err));
@@ -105,11 +240,18 @@ async function enviarMail(clienteId) {
 }
 
 async function guardarCliente() {
-  const nombre = document.getElementById('newNombre').value;
-  const pedido = document.getElementById('newPedido').value;
-  const mail = document.getElementById('newMail').value;
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para crear clientes.');
+    return;
+  }
 
-  if (!nombre || !mail) return alert('Nombre y correo son requeridos.');
+  const nombre = sanitizeText(document.getElementById('newNombre').value, 100);
+  const pedido = sanitizeText(document.getElementById('newPedido').value, 200);
+  const mail = sanitizeEmail(document.getElementById('newMail').value);
+
+  if (!nombre || !mail || !isValidEmail(mail)) return alert('Nombre y correo válido son requeridos.');
 
   const { error } = await supabaseClient.from('clientes').insert([{ nombre, pedido, mail, estado: 'sin aviso' }]);
   if (error) alert("Error al guardar: " + error.message);
@@ -121,9 +263,16 @@ async function guardarCliente() {
 }
 
 async function guardarTemplate() {
-  const id = document.getElementById('tplId').value.trim();
-  const nombre = document.getElementById('tplNombre').value;
-  const cuerpo = document.getElementById('tplCuerpo').value;
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para guardar plantillas.');
+    return;
+  }
+
+  const id = sanitizeTemplateId(document.getElementById('tplId').value);
+  const nombre = sanitizeText(document.getElementById('tplNombre').value, 150);
+  const cuerpo = sanitizeText(document.getElementById('tplCuerpo').value, 2000);
 
   if (!id || !nombre || !cuerpo) return alert('Todos los campos son obligatorios.');
 
@@ -136,6 +285,13 @@ async function guardarTemplate() {
 }
 
 async function eliminarCliente(id) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canDelete()) {
+    alert('Solo un admin puede eliminar clientes.');
+    return;
+  }
+
   if (confirm("¿Estás seguro de eliminar este registro?")) {
     await supabaseClient.from('clientes').delete().eq('id', id);
     cargarDatosEnvios();
@@ -159,7 +315,7 @@ function toggleSelectAll(masterId, className) {
 
 // RENDER DE TABLAS CON CHECKBOXES
 async function cargarPromosWeb() {
-  const { data: promos } = await supabaseClient.from('admin_promos').select('*');
+  const { data: promos } = await supabaseClient.from('admin_promos').select('*').order('created_at', { ascending: false });
   const tbody = document.getElementById('tblAdminPromos');
   if (!tbody || !promos) return;
 
@@ -184,15 +340,145 @@ async function cargarPromosWeb() {
   if (document.getElementById('kpiPromosInactivas')) document.getElementById('kpiPromosInactivas').innerText = inactivas;
 }
 
+async function cargarPromosBancarias() {
+  const { data: promos } = await supabaseClient.from('admin_promos_bancarias').select('*').order('created_at', { ascending: false });
+  const tbody = document.getElementById('tblAdminBancarias');
+  if (!tbody || !promos) return;
+
+  tbody.innerHTML = '';
+  let activas = 0;
+
+  promos.forEach(p => {
+    if ((p.estado_vigencia || '').toUpperCase() === 'ACTIVA' || p.activa === 'SI' || p.activa === true) activas++;
+    tbody.innerHTML += `
+      <tr>
+        <td><input type="checkbox" class="chk-bancaria" value="${p.id}"></td>
+        <td><small class="fw-bold">${p.id}</small></td>
+        <td><strong>${p.banco || '-'}</strong></td>
+        <td>${p.descuento || '-'}</td>
+        <td>${p.cuotas || '-'}</td>
+        <td><small>${p.vigencia_inicio || '-'}${p.vigencia_fin ? ` al ${p.vigencia_fin}` : ''}</small></td>
+        <td>${p.alcance || '-'}</td>
+        <td><span class="badge ${((p.estado_vigencia || '').toUpperCase() === 'ACTIVA' || p.activa === 'SI' || p.activa === true) ? 'bg-success' : 'bg-secondary'}">${p.estado_vigencia || (p.activa === 'SI' ? 'Activa' : 'Inactiva')}</span></td>
+      </tr>`;
+  });
+
+  if (document.getElementById('kpiPromosBancarias')) document.getElementById('kpiPromosBancarias').innerText = activas;
+}
+
+async function cargarNovedadesOperativas() {
+  const { data: novedades } = await supabaseClient.from('admin_novedades').select('*').order('created_at', { ascending: false });
+  const tbody = document.getElementById('tblAdminNovedades');
+  if (!tbody || !novedades) return;
+
+  tbody.innerHTML = '';
+
+  novedades.forEach(n => {
+    tbody.innerHTML += `
+      <tr>
+        <td><input type="checkbox" class="chk-novedad" value="${n.id}"></td>
+        <td><small class="fw-bold">${n.id}</small></td>
+        <td>${n.categoria || '-'}</td>
+        <td>${n.descripcion || '-'}</td>
+        <td><span class="badge ${n.activa === 'Si' || n.activa === true ? 'bg-success' : 'bg-secondary'}">${n.activa || 'No'}</span></td>
+      </tr>`;
+  });
+
+  if (document.getElementById('kpiNovedades')) document.getElementById('kpiNovedades').innerText = novedades.length;
+}
+
+async function cargarUsuariosRoles() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canWrite()) return;
+
+  const tbody = document.getElementById('tblUsuariosPermisos');
+  if (!tbody) return;
+
+  const { data: perfiles, error } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false });
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">No se pudieron cargar los permisos.</td></tr>`;
+    console.error(error);
+    return;
+  }
+
+  tbody.innerHTML = '';
+
+  if (!perfiles || perfiles.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3">Sin usuarios registrados.</td></tr>';
+    return;
+  }
+
+  perfiles.forEach(usuario => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><strong>${usuario.id ? usuario.id.slice(0, 8) : '-'}</strong></td>
+      <td>${usuario.role || 'viewer'}</td>
+      <td>
+        <select class="form-select form-select-sm" data-user-role-select="${usuario.id}">
+          <option value="viewer" ${usuario.role === 'viewer' ? 'selected' : ''}>viewer</option>
+          <option value="editor" ${usuario.role === 'editor' ? 'selected' : ''}>editor</option>
+          <option value="admin" ${usuario.role === 'admin' ? 'selected' : ''}>admin</option>
+        </select>
+      </td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-primary" data-user-role-save="${usuario.id}" data-role-action="write">Guardar</button>
+      </td>
+    `;
+
+    const saveButton = row.querySelector('[data-user-role-save]');
+    saveButton.addEventListener('click', () => guardarPermisoUsuario(usuario.id));
+
+    tbody.appendChild(row);
+  });
+
+  toggleAdminOnlySections();
+}
+
+async function guardarPermisoUsuario(userId) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canDelete()) {
+    alert('Solo el admin principal puede modificar permisos.');
+    return;
+  }
+
+  const selector = document.querySelector(`[data-user-role-select="${userId}"]`);
+  if (!selector) return;
+
+  const nuevoRol = selector.value;
+  const { error } = await supabaseClient.from('profiles').update({ role: nuevoRol }).eq('id', userId);
+
+  if (error) {
+    alert('Error al actualizar el rol: ' + error.message);
+    return;
+  }
+
+  if (userId === (await supabaseClient.auth.getUser()).data.user?.id) {
+    currentUserRole = nuevoRol;
+    applyRolePermissions();
+    toggleAdminOnlySections();
+  }
+
+  alert('Permiso actualizado correctamente.');
+  await cargarDatosAdmin();
+}
+
 // GUARDADO DE REGISTROS
 async function guardarNuevaPromoBancaria() {
-  const id = document.getElementById('pbId').value.trim();
-  const banco = document.getElementById('pbBanco').value.trim();
-  const descuento = document.getElementById('pbDescuento').value.trim();
-  const cuotas = document.getElementById('pbCuotas').value.trim();
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para crear promos bancarias.');
+    return;
+  }
+
+  const id = sanitizeTemplateId(document.getElementById('pbId').value);
+  const banco = sanitizeText(document.getElementById('pbBanco').value, 80);
+  const descuento = sanitizeText(document.getElementById('pbDescuento').value, 80);
+  const cuotas = sanitizeText(document.getElementById('pbCuotas').value, 30);
   const vigencia_inicio = document.getElementById('pbInicio').value;
   const vigencia_fin = document.getElementById('pbFin').value;
-  const alcance = document.getElementById('pbAlcance').value.trim();
+  const alcance = sanitizeText(document.getElementById('pbAlcance').value, 150);
 
   const { error } = await supabaseClient.from('admin_promos_bancarias').insert([{
     id, banco, descuento, cuotas, vigencia_inicio, vigencia_fin, alcance, activa: 'SI', estado_vigencia: 'ACTIVA'
@@ -206,9 +492,16 @@ async function guardarNuevaPromoBancaria() {
 }
 
 async function guardarNuevaNovedad() {
-  const id = document.getElementById('nId').value.trim();
-  const categoria = document.getElementById('nCategoria').value.trim();
-  const descripcion = document.getElementById('nDescripcion').value.trim();
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para crear novedades.');
+    return;
+  }
+
+  const id = sanitizeTemplateId(document.getElementById('nId').value);
+  const categoria = sanitizeText(document.getElementById('nCategoria').value, 80);
+  const descripcion = sanitizeText(document.getElementById('nDescripcion').value, 400);
 
   const { error } = await supabaseClient.from('admin_novedades').insert([{ id, categoria, descripcion, activa: 'Si' }]);
 
@@ -221,6 +514,13 @@ async function guardarNuevaNovedad() {
 
 // ENVÍO DE EMAIL CON SELECCIÓN
 async function enviarMailsSeleccionados(tipo) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canWrite()) {
+    alert('No tenés permisos para enviar notificaciones.');
+    return;
+  }
+
   let ids = [], tabla = '', asunto = '';
 
   if (tipo === 'promos') {
