@@ -3,382 +3,158 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestión de Pedidos y Envíos</title>
+  <title>Panel de Control Multisección</title>
+  
+  <!-- CSS Externos -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-  
-  <!-- SDK de Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- SDK de EmailJS -->
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
 
-  <style>
-    body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding-bottom: 40px; }
-    .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .badge-sin-aviso { background-color: #e2e3e5; color: #41464b; }
-    .badge-en-proceso { background-color: #cff4fc; color: #055160; }
-    .badge-enviado { background-color: #d1e7dd; color: #0f5132; }
-    .badge-error { background-color: #f8d7da; color: #842029; }
-    .auth-container { max-width: 400px; margin: 80px auto; }
-  </style>
+  <!-- SDKs -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 </head>
 <body>
 
-<!-- Pantalla de Login -->
-<div id="loginSection" class="auth-container">
-  <div class="card p-4">
-    <h3 class="text-center mb-3"><i class="bi bi-lock text-primary"></i> Iniciar Sesión</h3>
-    <form id="loginForm">
-      <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input type="email" id="loginEmail" class="form-control" required placeholder="tu@email.com">
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Contraseña</label>
-        <input type="password" id="loginPassword" class="form-control" required>
-      </div>
-      <button type="submit" class="btn btn-primary w-100">Ingresar</button>
-    </form>
-  </div>
-</div>
-
-<!-- Panel Principal -->
-<div id="appSection" class="container-fluid p-4 d-none">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
-    <div>
-      <button class="btn btn-outline-secondary me-2" onclick="cargarDatos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
-      <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-person-plus"></i> Nuevo Cliente</button>
-      <button class="btn btn-dark me-2" data-bs-toggle="modal" data-bs-target="#modalTemplates"><i class="bi bi-file-earmark-code"></i> Plantillas</button>
-      <button class="btn btn-outline-danger" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
+  <!-- Pantalla de Login -->
+  <div id="loginSection" class="auth-container">
+    <div class="card p-4">
+      <h3 class="text-center mb-3"><i class="bi bi-shield-lock text-primary"></i> Acceso al System</h3>
+      <form id="loginForm">
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="loginEmail" class="form-control" required placeholder="admin@empresa.com">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="loginPassword" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+      </form>
     </div>
   </div>
 
-  <div class="card p-3 mb-4">
-    <div class="row g-3 align-items-center">
-      <div class="col-md-4">
-        <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre, pedido o correo..." onkeyup="filtrarTabla()">
-      </div>
-    </div>
-  </div>
-
-  <div class="card p-3">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle">
-        <thead class="table-light">
-          <tr>
-            <th>Nombre</th>
-            <th>Pedido</th>
-            <th>Mail</th>
-            <th width="240">Plantilla Asignada</th>
-            <th>Enviar</th>
-            <th>Estado</th>
-            <th class="text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody">
-          <tr><td colspan="7" class="text-center py-4">Cargando datos...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Nuevo Cliente -->
-<div class="modal fade" id="modalCliente" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Agregar Nuevo Cliente</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="formCliente">
-          <div class="mb-3">
-            <label class="form-label">Nombre del Cliente</label>
-            <input type="text" id="newNombre" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Detalle del Pedido</label>
-            <input type="text" id="newPedido" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Correo Electrónico</label>
-            <input type="email" id="newMail" class="form-control" required>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" onclick="guardarCliente()">Guardar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Plantillas -->
-<div class="modal fade" id="modalTemplates" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Plantillas de Correo</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="formTemplate" class="mb-4">
-          <h6>Nueva Plantilla</h6>
-          <div class="row g-2 mb-2">
-            <div class="col-md-4">
-              <input type="text" id="tplId" class="form-control" placeholder="ID (ej: tpl_envio)" required>
-            </div>
-            <div class="col-md-8">
-              <input type="text" id="tplNombre" class="form-control" placeholder="Asunto del mail" required>
-            </div>
-          </div>
-          <div class="mb-2">
-            <textarea id="tplCuerpo" class="form-control" rows="3" placeholder="Cuerpo del correo. Podés usar {{nombre}} y {{pedido}}" required></textarea>
-          </div>
-          <button type="button" class="btn btn-sm btn-dark" onclick="guardarTemplate()">Guardar Plantilla</button>
-        </form>
-        <h6>Plantillas Registradas</h6>
-        <ul class="list-group" id="listTemplates"></ul>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  // 1. CONFIGURACIÓN DE SUPABASE
- const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
-
-  // 2. CONFIGURACIÓN DE EMAILJS
- const EMAILJS_SERVICE_ID = "service_n9o55gp";   
-  const EMAILJS_TEMPLATE_ID = "template_s8suav5";
-  const EMAILJS_PUBLIC_KEY = "kyyRWVy91lz7Wqh0Y";           
- 
-  // Inicialización de Servicios
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-  }
-
-  let clientesData = [];
-  let templatesData = [];
-
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      alert("Error al ingresar: " + error.message);
-    } else {
-      checkUser();
-    }
-  });
-
-  async function checkUser() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-      document.getElementById('loginSection').classList.add('d-none');
-      document.getElementById('appSection').classList.remove('d-none');
-      cargarDatos();
-    } else {
-      document.getElementById('loginSection').classList.remove('d-none');
-      document.getElementById('appSection').classList.add('d-none');
-    }
-  }
-
-  async function logout() {
-    await supabaseClient.auth.signOut();
-    checkUser();
-  }
-
-  async function cargarDatos() {
-    const { data: templates } = await supabaseClient.from('templates').select('*');
-    const { data: clientes } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
-    
-    templatesData = templates || [];
-    clientesData = clientes || [];
-    
-    renderTabla();
-    renderTemplates();
-  }
-
-  function renderTabla() {
-    const tbody = document.getElementById('tableBody');
-    tbody.innerHTML = '';
-
-    if (clientesData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Sin clientes registrados.</td></tr>';
-      return;
-    }
-
-    clientesData.forEach(c => {
-      let badgeClass = 'badge-sin-aviso';
-      if (c.estado === 'en proceso') badgeClass = 'badge-en-proceso';
-      if (c.estado === 'enviado') badgeClass = 'badge-enviado';
-      if (c.estado === 'error') badgeClass = 'badge-error';
-
-      let selectOptions = `<option value="">Seleccionar plantilla...</option>`;
-      templatesData.forEach(t => {
-        let isSelected = (String(t.id).trim() === String(c.template_id).trim()) ? 'selected' : '';
-        selectOptions += `<option value="${t.id}" ${isSelected}>${t.nombre}</option>`;
-      });
-
-      tbody.innerHTML += `
-        <tr>
-          <td><strong>${c.nombre}</strong></td>
-          <td>${c.pedido || '-'}</td>
-          <td>${c.mail}</td>
-          <td>
-            <select class="form-select form-select-sm" onchange="asignarPlantilla('${c.id}', this.value)">
-              ${selectOptions}
-            </select>
-          </td>
-          <td>
-            <button class="btn btn-sm btn-primary" id="btn-send-${c.id}" onclick="enviarMail('${c.id}')">
-              <i class="bi bi-send"></i> Enviar
-            </button>
-          </td>
-          <td><span class="badge ${badgeClass}" id="badge-${c.id}">${c.estado}</span></td>
-          <td class="text-center">
-            <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente('${c.id}')"><i class="bi bi-trash"></i></button>
-          </td>
-        </tr>
-      `;
-    });
-  }
-
-  function renderTemplates() {
-    const list = document.getElementById('listTemplates');
-    list.innerHTML = '';
-    templatesData.forEach(t => {
-      list.innerHTML += `<li class="list-group-item"><strong>${t.nombre}</strong> <small class="text-muted">(${t.id})</small><br><small>${t.cuerpo}</small></li>`;
-    });
-  }
-
-  async function asignarPlantilla(clienteId, templateId) {
-    const cliente = clientesData.find(c => String(c.id) === String(clienteId));
-    if (cliente) {
-      cliente.template_id = templateId;
-    }
-
-    const { error } = await supabaseClient
-      .from('clientes')
-      .update({ template_id: templateId })
-      .eq('id', clienteId);
-
-    if (error) {
-      alert("Error al asignar plantilla: " + error.message);
-    }
-  }
-
-  async function enviarMail(clienteId) {
-    const cliente = clientesData.find(c => String(c.id) === String(clienteId));
-    if (!cliente) return;
-
-    if (!cliente.template_id) {
-      alert("Por favor, selecciona una plantilla para este cliente antes de enviar.");
-      return;
-    }
-
-    const template = templatesData.find(t => String(t.id) === String(cliente.template_id));
-    if (!template) {
-      alert("La plantilla seleccionada no existe.");
-      return;
-    }
-
-    const asuntoFinal = template.nombre.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || '');
-    const cuerpoFinal = template.cuerpo.replace(/\{\{nombre\}\}/g, cliente.nombre).replace(/\{\{pedido\}\}/g, cliente.pedido || '');
-
-    const btn = document.getElementById(`btn-send-${clienteId}`);
-    if (btn) btn.disabled = true;
-
-    try {
-      const params = {
-        email_destino: cliente.mail,
-        asunto: asuntoFinal,
-        mensaje: cuerpoFinal
-      };
-
-      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
-
-      await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
+  <!-- Layout Principal -->
+  <div id="appSection" class="container-fluid d-none">
+    <div class="row">
       
-      alert(`📧 Mail enviado con éxito a ${cliente.mail}`);
-      cargarDatos();
+      <!-- Sidebar / Navegación -->
+      <nav class="col-md-3 col-lg-2 d-md-block sidebar p-3">
+        <h5 class="text-white mb-4 ps-2"><i class="bi bi-speedometer2 me-2"></i> Control Hub</h5>
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" onclick="navegar('secEnvios', this)">
+              <i class="bi bi-truck me-2"></i> Envíos y Pedidos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegar('secReviews', this)">
+              <i class="bi bi-star-fill me-2"></i> Solicitar Reviews
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegar('secAdmin', this)">
+              <i class="bi bi-pie-chart me-2"></i> Admin Interno
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegar('secArrepentimiento', this)">
+              <i class="bi bi-arrow-counterclockwise me-2"></i> Arrepentimiento
+            </a>
+          </li>
+        </ul>
+        <hr class="text-secondary">
+        <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</button>
+      </nav>
 
-    } catch (err) {
-      alert("❌ Error al enviar mail: " + JSON.stringify(err));
-      await supabaseClient.from('clientes').update({ estado: 'error' }).eq('id', clienteId);
-      cargarDatos();
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  }
+      <!-- Main Content -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
 
-  async function guardarCliente() {
-    const nombre = document.getElementById('newNombre').value;
-    const pedido = document.getElementById('newPedido').value;
-    const mail = document.getElementById('newMail').value;
+        <!-- 1. Envíos -->
+        <section id="secEnvios" class="seccion-app">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Pedidos y Envíos</h2>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-plus-lg"></i> Nuevo Cliente</button>
+          </div>
+          <div class="card p-3 mb-3">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar..." onkeyup="filtrarTabla()">
+          </div>
+          <div class="card p-3">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr><th>Cliente</th><th>Pedido</th><th>Mail</th><th>Plantilla</th><th>Acción</th><th>Estado</th></tr>
+              </thead>
+              <tbody id="tableBody">
+                <tr><td colspan="6" class="text-center py-3">Cargando envíos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-    if (!nombre || !mail) {
-      alert('Nombre y correo son requeridos.');
-      return;
-    }
+        <!-- 2. Reviews -->
+        <section id="secReviews" class="seccion-app d-none">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2><i class="bi bi-star text-warning"></i> Solicitud de Reviews</h2>
+          </div>
+          <div class="card p-3">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr><th>Cliente</th><th>Producto</th><th>Mail</th><th>Estado</th><th>Acción</th></tr>
+              </thead>
+              <tbody id="tableBodyReviews">
+                <tr><td colspan="5" class="text-center py-3">Sin solicitudes de review pendientes.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-    const { error } = await supabaseClient.from('clientes').insert([{ nombre, pedido, mail, estado: 'sin aviso' }]);
-    if (error) {
-      alert("Error al guardar: " + error.message);
-    } else {
-      bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
-      document.getElementById('formCliente').reset();
-      cargarDatos();
-    }
-  }
+        <!-- 3. Admin Interno -->
+        <section id="secAdmin" class="seccion-app d-none">
+          <h2 class="mb-4"><i class="bi bi-shield-check text-success"></i> Panel Admin Interno</h2>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="card p-3 border-start border-primary border-4">
+                <h5>Campañas Activas</h5>
+                <p class="fs-2 fw-bold text-primary mb-0">3</p>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card p-3 border-start border-success border-4">
+                <h5>Promociones Bancarias</h5>
+                <p class="fs-2 fw-bold text-success mb-0">6 Cuotas</p>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card p-3 border-start border-warning border-4">
+                <h5>Novedades Operativas</h5>
+                <p class="fs-6 text-dark mt-2 mb-0">Normal funcionamiento de depósitos.</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
-  async function guardarTemplate() {
-    const id = document.getElementById('tplId').value.trim();
-    const nombre = document.getElementById('tplNombre').value;
-    const cuerpo = document.getElementById('tplCuerpo').value;
+        <!-- 4. Botón de Arrepentimiento -->
+        <section id="secArrepentimiento" class="seccion-app d-none">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2><i class="bi bi-arrow-counterclockwise text-danger"></i> Solicitudes de Arrepentimiento</h2>
+          </div>
+          <div class="card p-3">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr><th>Fecha</th><th>Cliente</th><th>Pedido</th><th>Motivo</th><th>Estado</th></tr>
+              </thead>
+              <tbody id="tableBodyArrepentimiento">
+                <tr><td colspan="5" class="text-center py-3">Sin registros.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-    if (!id || !nombre || !cuerpo) {
-      alert('Todos los campos son obligatorios.');
-      return;
-    }
+      </main>
+    </div>
+  </div>
 
-    const { error } = await supabaseClient.from('templates').insert([{ id, nombre, cuerpo }]);
-    if (error) {
-      alert("Error al guardar plantilla: " + error.message);
-    } else {
-      document.getElementById('formTemplate').reset();
-      cargarDatos();
-    }
-  }
-
-  async function eliminarCliente(id) {
-    if (confirm("¿Estás seguro de eliminar este registro?")) {
-      await supabaseClient.from('clientes').delete().eq('id', id);
-      cargarDatos();
-    }
-  }
-
-  function filtrarTabla() {
-    const text = document.getElementById('searchInput').value.toLowerCase();
-    const rows = document.querySelectorAll('#tableBody tr');
-    rows.forEach(row => {
-      row.style.display = row.innerText.toLowerCase().includes(text) ? '' : 'none';
-    });
-  }
-
-  window.onload = checkUser;
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
- 
-  
-

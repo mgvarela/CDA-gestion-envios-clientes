@@ -1,0 +1,34 @@
+body { 
+  background-color: #f4f6f9; 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+}
+
+.sidebar { 
+  min-height: 100vh; 
+  background-color: #212529; 
+  color: #fff; 
+}
+
+.sidebar .nav-link { 
+  color: #adb5bd; 
+  font-size: 0.95rem; 
+  margin-bottom: 4px; 
+}
+
+.sidebar .nav-link:hover, 
+.sidebar .nav-link.active { 
+  color: #fff; 
+  background-color: #0d6efd; 
+  border-radius: 6px; 
+}
+
+.auth-container { 
+  max-width: 400px; 
+  margin: 80px auto; 
+}
+
+.card { 
+  border: none; 
+  border-radius: 10px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+}
