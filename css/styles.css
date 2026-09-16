@@ -22,10 +22,100 @@ body {
   padding-bottom: 40px;
 }
 
+#appSection > .row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
 .sidebar {
+  flex: 0 0 240px;
+  max-width: 240px;
   min-height: 100vh;
   background-color: var(--color-blue-dark);
   color: var(--color-white);
+  transition: flex-basis 180ms ease-in-out, max-width 180ms ease-in-out, padding 180ms ease-in-out;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+}
+
+.sidebar-header {
+  position: relative;
+}
+
+.sidebar-header h5 {
+  padding-right: 38px;
+}
+
+.sidebar-collapse-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--color-white);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+}
+
+#appSection.sidebar-compact .sidebar {
+  flex-basis: 76px;
+  max-width: 76px;
+  padding-right: 0.75rem !important;
+  padding-left: 0.75rem !important;
+}
+
+#appSection.sidebar-compact .sidebar-title-label,
+#appSection.sidebar-compact .sidebar-role-label,
+#appSection.sidebar-compact .sidebar-label {
+  display: none;
+}
+
+#appSection.sidebar-compact .sidebar h5,
+#appSection.sidebar-compact .sidebar .nav-link,
+#appSection.sidebar-compact .sidebar .btn-danger {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  text-align: center;
+}
+
+#appSection.sidebar-compact .sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#appSection.sidebar-compact .sidebar-header h5 {
+  width: 100%;
+  padding-right: 0 !important;
+}
+
+#appSection.sidebar-compact .sidebar-collapse-button {
+  position: static;
+  margin: -10px auto 12px;
+}
+
+#appSection.sidebar-compact .sidebar .nav-link i {
+  margin-right: 0 !important;
+}
+
+#appSection.sidebar-compact .img-logo {
+  width: 44px;
+  height: 44px;
+  margin-left: 0;
+  margin-right: 0;
+  object-fit: cover;
+  object-position: left center;
 }
 
 .sidebar-toggle,
@@ -86,16 +176,20 @@ body {
   width: 70%;
   margin: 10px auto 20px;
   text-align: center;
-  display: flex;
+  display: block;
 }
 
 /* Adaptabilidad Móvil */
 @media (max-width: 767.98px) {
   #appSection > .row {
+    display: block;
+    flex-wrap: initial;
     min-height: 100vh;
   }
 
   .sidebar {
+    flex: none;
+    max-width: none;
     position: fixed;
     inset: 0 auto 0 0;
     width: min(82vw, 300px);
@@ -109,6 +203,22 @@ body {
 
   .sidebar.is-open {
     transform: translateX(0);
+  }
+
+  .sidebar-collapse-button {
+    display: none;
+  }
+
+  #appSection.sidebar-compact .sidebar {
+    flex-basis: auto;
+    max-width: none;
+    padding: 1rem !important;
+  }
+
+  #appSection.sidebar-compact .sidebar-title-label,
+  #appSection.sidebar-compact .sidebar-role-label,
+  #appSection.sidebar-compact .sidebar-label {
+    display: inline;
   }
 
   .sidebar-toggle {

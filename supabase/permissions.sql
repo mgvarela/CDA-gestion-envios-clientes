@@ -59,6 +59,9 @@ create table if not exists public.pedidos_mercaderia (
   confirmo text,
   actualizado text,
   st_depo numeric default 0,
+  emails_destino text,
+  desde_hasta text,
+  tipo_plantilla text default 'pedido_mercaderia',
   estado text not null default 'pendiente',
   fecha_envio timestamptz,
   created_at timestamptz not null default now()
@@ -78,6 +81,10 @@ create table if not exists public.arrepentimientos (
 
 alter table public.arrepentimientos add column if not exists fecha_envio timestamptz;
 alter table public.arrepentimientos add column if not exists created_at timestamptz default now();
+alter table public.pedidos_mercaderia add column if not exists emails_destino text;
+alter table public.pedidos_mercaderia add column if not exists desde_hasta text;
+alter table public.pedidos_mercaderia add column if not exists tipo_plantilla text default 'pedido_mercaderia';
+alter table public.pedidos_mercaderia add column if not exists fecha_envio timestamptz;
 
 -- La funcion evita consultar profiles desde una policy de profiles y caer en recursion.
 create or replace function public.current_user_role()

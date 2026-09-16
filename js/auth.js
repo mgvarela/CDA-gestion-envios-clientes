@@ -98,6 +98,7 @@ async function navegar(seccion, elementoLink) {
 
     // Disparar carga de datos según sección
     if (seccion === 'envios' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
+    if (seccion === 'seguimiento' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
     if (seccion === 'admin' && typeof cargarDatosAdmin === 'function') cargarDatosAdmin();
     if (seccion === 'pedidos' && typeof cargarPedidos === 'function') cargarPedidos();
     if (seccion === 'arrepentimiento' && typeof cargarArrepentimientos === 'function') cargarArrepentimientos();
@@ -123,6 +124,33 @@ function closeSidebar() {
 
   sidebar.classList.remove('is-open');
   overlay.classList.remove('is-visible');
+}
+
+function toggleSidebarCompact() {
+  const app = document.getElementById('appSection');
+  if (!app) return;
+  const compact = app.classList.toggle('sidebar-compact');
+  localStorage.setItem('sidebarCompact', compact ? 'true' : 'false');
+
+  const button = document.querySelector('.sidebar-collapse-button');
+  if (button) {
+    button.setAttribute('aria-label', compact ? 'Expandir menú' : 'Contraer menú');
+    button.setAttribute('title', compact ? 'Expandir menú' : 'Contraer menú');
+    button.innerHTML = `<i class="bi ${compact ? 'bi-chevron-right' : 'bi-chevron-left'}"></i>`;
+  }
+}
+
+function restaurarEstadoSidebar() {
+  if (window.innerWidth < 768) return;
+  const app = document.getElementById('appSection');
+  if (!app || localStorage.getItem('sidebarCompact') !== 'true') return;
+  app.classList.add('sidebar-compact');
+  const button = document.querySelector('.sidebar-collapse-button');
+  if (button) {
+    button.setAttribute('aria-label', 'Expandir menú');
+    button.setAttribute('title', 'Expandir menú');
+    button.innerHTML = '<i class="bi bi-chevron-right"></i>';
+  }
 }
 
 // Compatibilidad con vistas cacheadas que todavía llaman la función sin window.
@@ -178,6 +206,7 @@ async function checkUser() {
     await loadUserRole();
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
+    restaurarEstadoSidebar();
     navegar('admin', document.querySelector('.sidebar .nav-link.active'));
   } else {
     currentUserRole = 'viewer';

@@ -1,0 +1,45 @@
+<!-- CABECERA DE SECCIÓN -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-geo-alt text-primary me-2"></i>Seguimiento de Entregas</h2>
+  <div>
+    <button class="btn btn-outline-secondary me-2 btn-sm" onclick="cargarDatosEnvios()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+    <button class="btn btn-primary me-2 btn-sm" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-person-plus"></i> Nuevo Cliente</button>
+    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalTemplates"><i class="bi bi-file-earmark-code"></i> Plantillas</button>
+  </div>
+</div>
+
+<!-- BUSCADOR DE LOGÍSTICA POR FACTURA (DISPATCHTRACK) -->
+<div class="card p-3 mb-4 border-start border-4 border-primary shadow-sm">
+  <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-truck text-primary me-1"></i> Consulta de Estado de Entrega (DispatchTrack)</h6>
+  <div class="row g-2 align-items-center">
+    <div class="col-md-5 col-lg-4">
+      <div class="input-group input-group-sm">
+        <input type="text" id="inputFactura" class="form-control" placeholder="Ingrese N° de Factura..." onkeyup="if(event.key === 'Enter') buscarEstadoPorFactura()">
+        <button class="btn btn-primary" onclick="buscarEstadoPorFactura()"><i class="bi bi-search"></i> Buscar</button>
+      </div>
+    </div>
+    <div class="col-md-7 col-lg-8" id="resultadoLogistica">
+      <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Ingresá el número de comprobante y presioná Buscar para ver los datos del contacto y la entrega.</small>
+    </div>
+  </div>
+</div>
+
+<!-- FILTRO Y TABLA DE CLIENTES -->
+<div class="card p-3 mb-4">
+  <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Buscar en la tabla por nombre, pedido o correo..." onkeyup="filtrarTabla()">
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Nombre</th><th>Pedido</th><th>Mail</th><th width="240">Plantilla</th><th>Enviar</th><th>Estado</th><th>Fecha y hora de envío</th><th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="8" class="text-center py-4">Cargando datos...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

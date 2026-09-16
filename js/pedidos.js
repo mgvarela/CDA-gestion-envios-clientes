@@ -19,7 +19,10 @@ const PEDIDOS_COLUMNAS = {
   confirmo: ['Confirmo', 'Confirmado'],
   actualizado: ['Actualizado'],
   st_depo: ['st_depo', 'St_Depo', 'Stock Deposito', 'Stock Depósito'],
-  estado: ['Estado']
+  estado: ['Estado'],
+  emails_destino: ['Emails Destino', 'Emails', 'Mail', 'Correo'],
+  desde_hasta: ['Desde / Hasta', 'Desde Hasta', 'Tramo'],
+  tipo_plantilla: ['Plantilla', 'Tipo Plantilla']
 };
 
 function normalizarClaveColumna(value) {
@@ -53,6 +56,9 @@ function convertirFilaPedido(row, index) {
   pedido.st_reservado = numeroSeguro(pedido.st_reservado);
   pedido.st_depo = numeroSeguro(pedido.st_depo);
   pedido.estado = pedido.estado || (pedido.st_depo > 1 ? 'con stock' : 'pendiente');
+  pedido.emails_destino = pedido.emails_destino || 'deposito.central@lacasadelaudio.com, grupoclientes@casadelaudio.com';
+  pedido.desde_hasta = pedido.desde_hasta || `Depósito -> ${pedido.sucursal_ent || 'Sucursal'}`;
+  pedido.tipo_plantilla = pedido.tipo_plantilla || 'pedido_mercaderia';
   return pedido;
 }
 
@@ -103,9 +109,7 @@ function leerArchivoPedidos(file) {
       try {
         const buffer = event.target.result;
         if (/\.csv$/i.test(file.name)) {
-          const parsed = Papa.parse(new TextDecoder('utf-8').decode(buffer), { header: true, skipEmptyLines: true });
-          if (parsed.errors.length) throw new Error(parsed.errors[0].message);
-          resolve(parsed.data);
+          resolve(parsearCsvLocal(new TextDecoder('utf-8').decode(buffer)));
           return;
         }
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
@@ -120,6 +124,46 @@ function leerArchivoPedidos(file) {
   });
 }
 
+function parsearCsvLocal(text) {
+  const rows = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const nextCharacter = text[index + 1];
+
+    if (character === '"' && quoted && nextCharacter === '"') {
+      value += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (!quoted && (character === ';' || character === ',')) {
+      row.push(value.trim());
+      value = '';
+    } else if (!quoted && (character === '\n' || character === '\r')) {
+      if (character === '\r' && nextCharacter === '\n') index += 1;
+      row.push(value.trim());
+      if (row.some(cell => cell !== '')) rows.push(row);
+      row = [];
+      value = '';
+    } else {
+      value += character;
+    }
+  }
+
+  row.push(value.trim());
+  if (row.some(cell => cell !== '')) rows.push(row);
+  if (rows.length < 2) return [];
+
+  const headers = rows[0];
+  return rows.slice(1).map(cells => headers.reduce((result, header, index) => {
+    result[header] = cells[index] ?? '';
+    return result;
+  }, {}));
+}
+
 function renderizarPedidos() {
   const tbody = document.getElementById('cuerpoPedidos');
   if (!tbody) return;
@@ -131,7 +175,7 @@ function renderizarPedidos() {
 
   document.getElementById('resumenPedidos').textContent = `${visibles.length} registros`;
   if (!visibles.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No hay registros para mostrar.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4">No hay registros para mostrar.</td></tr>';
     return;
   }
 
@@ -142,14 +186,25 @@ function renderizarPedidos() {
       <td>${escapeHtml(pedido.cod_cliente || '-')}</td>
       <td>${escapeHtml(pedido.documento || '-')}</td>
       <td>${escapeHtml(pedido.fecha_venta || '-')}</td>
+      <td>
+        <input class="form-control form-control-sm mb-1" id="emails-${pedido.id}" value="${escapeHtml(pedido.emails_destino || '')}" onchange="guardarCambiosPedido('${pedido.id}')" placeholder="email1, email2, email3">
+      </td>
       <td><strong>${escapeHtml(pedido.clave || '-')}</strong><br><small>${escapeHtml(pedido.articulo || '-')}</small></td>
-      <td>${pedido.cantidad ?? 0}</td>
-      <td>${pedido.st_disponible ?? 0}</td>
-      <td><span class="badge ${Number(pedido.st_depo) > 1 ? 'bg-success' : 'bg-secondary'}">${pedido.st_depo ?? 0}</span></td>
-      <td>${escapeHtml(pedido.sucursal_ent || '-')}</td>
+      <td><input class="form-control form-control-sm" id="desde-${pedido.id}" value="${escapeHtml(pedido.desde_hasta || '')}" onchange="guardarCambiosPedido('${pedido.id}')"></td>
+      <td>
+        <select class="form-select form-select-sm" id="plantilla-${pedido.id}" onchange="guardarCambiosPedido('${pedido.id}')">
+          <option value="pedido_mercaderia" ${pedido.tipo_plantilla === 'pedido_mercaderia' ? 'selected' : ''}>Pedido de mercadería</option>
+          <option value="reorganizacion_entrega" ${pedido.tipo_plantilla === 'reorganizacion_entrega' ? 'selected' : ''}>Aviso reorganización entrega</option>
+          <option value="sin_stock_cliente" ${pedido.tipo_plantilla === 'sin_stock_cliente' ? 'selected' : ''}>Aviso sin stock a cliente</option>
+        </select>
+      </td>
       <td><span class="badge ${pedido.estado === 'enviado' ? 'bg-success' : 'bg-warning text-dark'}">${escapeHtml(pedido.estado || 'pendiente')}</span></td>
+      <td>${pedido.fecha_envio ? new Date(pedido.fecha_envio).toLocaleString('es-AR') : '-'}</td>
+      <td><button class="btn btn-primary btn-sm" type="button" data-role-action="write" onclick="enviarPedido('${pedido.id}')"><i class="bi bi-send"></i> Enviar</button></td>
     </tr>
   `).join('');
+
+  if (typeof applyRolePermissions === 'function') applyRolePermissions();
 }
 
 function filtrarPedidos() {
@@ -158,6 +213,119 @@ function filtrarPedidos() {
 
 function seleccionarTodosPedidos(checked) {
   document.querySelectorAll('.pedido-checkbox').forEach(input => { input.checked = checked; });
+}
+
+function obtenerPedido(id) {
+  return pedidosMercaderia.find(pedido => String(pedido.id) === String(id));
+}
+
+function obtenerCambiosPedido(pedido) {
+  const emails = document.getElementById(`emails-${pedido.id}`)?.value.trim() || '';
+  const desdeHasta = document.getElementById(`desde-${pedido.id}`)?.value.trim() || '';
+  const tipoPlantilla = document.getElementById(`plantilla-${pedido.id}`)?.value || 'pedido_mercaderia';
+  pedido.emails_destino = emails;
+  pedido.desde_hasta = desdeHasta;
+  pedido.tipo_plantilla = tipoPlantilla;
+  return { emails_destino: emails, desde_hasta: desdeHasta, tipo_plantilla: tipoPlantilla };
+}
+
+async function guardarCambiosPedido(id) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canWrite()) return;
+  const pedido = obtenerPedido(id);
+  if (!pedido) return;
+
+  const cambios = obtenerCambiosPedido(pedido);
+  const { error } = await supabaseClient.from('pedidos_mercaderia').update(cambios).eq('id', id);
+  if (error) mostrarEstadoPedidos(`No se pudieron guardar los cambios: ${error.message}`, 'danger');
+}
+
+function obtenerEmailsPedido(pedido) {
+  return String(pedido.emails_destino || '')
+    .split(/[;,]/)
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function validarEmails(emails) {
+  return emails.length > 0 && emails.every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+}
+
+function construirMensajePedido(pedido) {
+  const plantilla = pedido.tipo_plantilla || 'pedido_mercaderia';
+  if (plantilla === 'sin_stock_cliente') {
+    return `Hola ${pedido.cliente || ''},\n\nTe informamos que el producto ${pedido.articulo || ''} (${pedido.clave || '-'}) no cuenta con stock disponible para el pedido ${pedido.documento || '-'}.\n\nFecha de venta: ${pedido.fecha_venta || '-'}\n\nPor favor comunicate con Atención al Cliente.`;
+  }
+
+  if (plantilla === 'reorganizacion_entrega') {
+    return `Pedido de reorganización de entrega\n\nPedido: ${pedido.documento || '-'}\nCliente: ${pedido.cliente || '-'}\nArtículo: ${pedido.articulo || '-'}\nClave: ${pedido.clave || '-'}\nDesde / Hasta: ${pedido.desde_hasta || '-'}\nCantidad: ${pedido.cantidad || 0}`;
+  }
+
+  return `Pedido de mercadería\n\nPedido: ${pedido.documento || '-'}\nCliente: ${pedido.cliente || '-'}\nDNI / Código: ${pedido.cod_cliente || '-'}\nArtículo: ${pedido.articulo || '-'}\nClave: ${pedido.clave || '-'}\nCantidad: ${pedido.cantidad || 0}\nStock disponible: ${pedido.st_disponible || 0}\nDesde / Hasta: ${pedido.desde_hasta || '-'}`;
+}
+
+async function enviarPedido(id) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canWrite()) {
+    alert('No tenés permisos para enviar pedidos.');
+    return false;
+  }
+
+  const pedido = obtenerPedido(id);
+  if (!pedido) return false;
+  obtenerCambiosPedido(pedido);
+  const emails = obtenerEmailsPedido(pedido);
+  if (!validarEmails(emails)) {
+    alert('Cargá al menos un email válido para el pedido seleccionado.');
+    return false;
+  }
+
+  const boton = document.querySelector(`[onclick="enviarPedido('${id}')"]`);
+  if (boton) boton.disabled = true;
+
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      email_destino: emails[0],
+      email_cc: emails.slice(1).join(','),
+      asunto: `Solicitud de mercadería - Pedido ${pedido.documento || '-'}`,
+      mensaje: construirMensajePedido(pedido)
+    });
+
+    const fechaEnvio = new Date().toISOString();
+    const { error } = await supabaseClient.from('pedidos_mercaderia').update({
+      emails_destino: emails.join(', '),
+      desde_hasta: pedido.desde_hasta,
+      tipo_plantilla: pedido.tipo_plantilla,
+      estado: 'enviado',
+      fecha_envio: fechaEnvio
+    }).eq('id', id);
+    if (error) throw error;
+
+    pedido.estado = 'enviado';
+    pedido.fecha_envio = fechaEnvio;
+    renderizarPedidos();
+    return true;
+  } catch (error) {
+    mostrarEstadoPedidos(`No se pudo enviar el pedido: ${error.message || error.text || error}`, 'danger');
+    return false;
+  } finally {
+    if (boton) boton.disabled = false;
+  }
+}
+
+async function enviarPedidosSeleccionados() {
+  const ids = Array.from(document.querySelectorAll('.pedido-checkbox:checked')).map(input => input.value);
+  if (!ids.length) {
+    alert('Seleccioná al menos un pedido.');
+    return;
+  }
+  if (!confirm(`¿Confirmás el envío de ${ids.length} pedido(s)?`)) return;
+
+  let enviados = 0;
+  for (const id of ids) {
+    if (await enviarPedido(id)) enviados += 1;
+  }
+  mostrarEstadoPedidos(`Se enviaron ${enviados} de ${ids.length} pedido(s).`, enviados === ids.length ? 'success' : 'warning');
 }
 
 function exportarStockPositivo() {
@@ -222,4 +390,7 @@ window.importarPedidos = importarPedidos;
 window.exportarStockPositivo = exportarStockPositivo;
 window.filtrarPedidos = filtrarPedidos;
 window.seleccionarTodosPedidos = seleccionarTodosPedidos;
+window.guardarCambiosPedido = guardarCambiosPedido;
+window.enviarPedido = enviarPedido;
+window.enviarPedidosSeleccionados = enviarPedidosSeleccionados;
 window.cargarArrepentimientos = cargarArrepentimientos;

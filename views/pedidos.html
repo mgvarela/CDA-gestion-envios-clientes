@@ -8,6 +8,7 @@
     <input type="file" id="archivoPedidos" accept=".csv,.xlsx,.xls" hidden onchange="importarPedidos(event)">
     <button class="btn btn-outline-success btn-sm" type="button" onclick="exportarStockPositivo()"><i class="bi bi-download"></i> Exportar stock &gt; 1</button>
     <button class="btn btn-outline-secondary btn-sm" type="button" onclick="cargarPedidos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+    <button class="btn btn-success btn-sm" type="button" data-role-action="write" onclick="enviarPedidosSeleccionados()"><i class="bi bi-send"></i> Enviar seleccionados</button>
   </div>
 </div>
 
@@ -32,10 +33,10 @@
         <tr>
           <th><input type="checkbox" id="chkTodosPedidos" onchange="seleccionarTodosPedidos(this.checked)"></th>
           <th>Cliente</th><th>DNI / Código</th><th>Documento</th><th>Fecha venta</th>
-          <th>Clave / Artículo</th><th>Cantidad</th><th>Stock disponible</th><th>Stock depósito</th><th>Destino</th><th>Estado</th>
+          <th>Emails Destino (hasta 3)</th><th>Clave / Artículo</th><th>Desde / Hasta</th><th>Plantilla</th><th>Estado</th><th>Fecha y hora de envío</th><th>Acción</th>
         </tr>
       </thead>
-      <tbody id="cuerpoPedidos"><tr><td colspan="11" class="text-center py-4">Todavía no hay pedidos importados.</td></tr></tbody>
+      <tbody id="cuerpoPedidos"><tr><td colspan="12" class="text-center py-4">Todavía no hay pedidos importados.</td></tr></tbody>
     </table>
   </div>
 </div>
