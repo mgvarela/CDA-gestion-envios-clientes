@@ -123,6 +123,23 @@ function closeSidebar() {
   overlay.classList.remove('is-visible');
 }
 
+// Compatibilidad con vistas cacheadas que todavía llaman la función sin window.
+window.mostrarPanelUsuarios = function mostrarPanelUsuariosGlobal() {
+  document.querySelectorAll('#adminTabs .nav-link').forEach(link => link.classList.remove('active'));
+  document.querySelectorAll('.tab-content .tab-pane').forEach(panel => panel.classList.remove('show', 'active'));
+
+  const tab = document.getElementById('tab-usuarios');
+  const panel = document.getElementById('content-usuarios');
+  if (!tab || !panel) return;
+
+  tab.classList.add('active');
+  panel.classList.add('show', 'active');
+
+  if (typeof cargarUsuariosRoles === 'function') {
+    cargarUsuariosRoles();
+  }
+};
+
 // CARGA DE COMPONENTES MODALES
 async function cargarModales() {
   const container = document.getElementById('modalsContainer');
