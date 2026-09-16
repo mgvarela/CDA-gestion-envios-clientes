@@ -80,6 +80,7 @@ if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 
 // NAVEGACIÓN Y CARGA DINÁMICA DE VISTAS
 async function navegar(seccion, elementoLink) {
+  closeSidebar();
   document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
   if (elementoLink) elementoLink.classList.add('active');
 
@@ -102,6 +103,24 @@ async function navegar(seccion, elementoLink) {
   } catch (err) {
     mainContent.innerHTML = `<div class="alert alert-danger m-4">No se pudo cargar la sección. ${err.message}</div>`;
   }
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (!sidebar || !overlay) return;
+
+  sidebar.classList.toggle('is-open');
+  overlay.classList.toggle('is-visible');
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (!sidebar || !overlay) return;
+
+  sidebar.classList.remove('is-open');
+  overlay.classList.remove('is-visible');
 }
 
 // CARGA DE COMPONENTES MODALES
@@ -140,7 +159,7 @@ async function checkUser() {
     await loadUserRole();
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
-    navegar('envios', document.querySelector('.sidebar .nav-link.active'));
+    navegar('admin', document.querySelector('.sidebar .nav-link.active'));
   } else {
     currentUserRole = 'viewer';
     document.getElementById('loginSection').classList.remove('d-none');

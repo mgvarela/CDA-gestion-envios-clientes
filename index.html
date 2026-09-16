@@ -36,17 +36,21 @@
 
 <!-- LAYOUT PRINCIPAL -->
 <div id="appSection" class="container-fluid d-none p-0">
+  <button class="btn sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="Abrir menú" aria-controls="appSidebar">
+    <i class="bi bi-list"></i>
+  </button>
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
   <div class="row g-0">
     
     <!-- Sidebar / Navegación -->
-    <nav class="col-md-3 col-lg-2 sidebar p-3">
+    <nav class="col-md-3 col-lg-2 sidebar p-3" id="appSidebar">
       <h5 class="text-white mb-4 ps-2"><img class="img-logo" src="css/img/logo_white.png" alt="Control Ecommerce" class="img-fluid">Control Ecommerce</h5>
       <div class="mb-3 ps-2">
         <span class="badge bg-light text-dark">Rol: <span id="currentUserRoleLabel">viewer</span></span>
       </div>
       <ul class="nav flex-column">
         <li class="nav-item">
-          <a class="nav-link active" href="#" onclick="navegar('envios', this)">
+          <a class="nav-link" href="#" onclick="navegar('envios', this)">
             <i class="bi bi-truck me-2"></i> Envíos y Pedidos
           </a>
         </li>
@@ -56,8 +60,8 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="#" onclick="navegar('admin', this)">
-            <i class="bi bi-pie-chart me-2"></i> Admin Interno
+          <a class="nav-link active" href="#" onclick="navegar('admin', this)">
+            <i class="bi bi-pie-chart me-2"></i> Admin novedades
           </a>
         </li>
         <li class="nav-item">

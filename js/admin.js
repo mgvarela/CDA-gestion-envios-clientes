@@ -24,6 +24,19 @@ async function cargarDatosAdmin() {
   ]);
 }
 
+function mostrarPanelUsuarios() {
+  document.querySelectorAll('#adminTabs .nav-link').forEach(link => link.classList.remove('active'));
+  document.querySelectorAll('.tab-content .tab-pane').forEach(panel => panel.classList.remove('show', 'active'));
+
+  const tab = document.getElementById('tab-usuarios');
+  const panel = document.getElementById('content-usuarios');
+  if (!tab || !panel) return;
+
+  tab.classList.add('active');
+  panel.classList.add('show', 'active');
+  cargarUsuariosRoles();
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')

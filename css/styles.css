@@ -28,6 +28,11 @@ body {
   color: var(--color-white);
 }
 
+.sidebar-toggle,
+.sidebar-overlay {
+  display: none;
+}
+
 .sidebar .nav-link {
   color: var(--color-white);
   font-size: 0.95rem;
@@ -86,13 +91,59 @@ body {
 
 /* Adaptabilidad Móvil */
 @media (max-width: 767.98px) {
+  #appSection > .row {
+    min-height: 100vh;
+  }
+
   .sidebar {
-    min-height: auto !important;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(82vw, 300px);
+    min-height: 100vh !important;
     padding: 1rem !important;
+    z-index: 1050;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 180ms ease-in-out;
+  }
+
+  .sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    z-index: 1040;
+    color: var(--color-white);
+    background-color: var(--color-blue-dark);
+    border: 0;
+    border-radius: 8px;
+    font-size: 1.35rem;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1045;
+    background: rgba(15, 23, 42, 0.55);
+  }
+
+  .sidebar-overlay.is-visible {
+    display: block;
   }
 
   main {
+    width: 100%;
+    min-height: 100vh;
     padding: 1rem !important;
+    padding-top: 4.5rem !important;
   }
 
   .table-responsive {
