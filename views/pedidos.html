@@ -1,0 +1,41 @@
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-2 mb-4">
+  <div>
+    <h2 class="mb-1"><i class="bi bi-box-seam text-primary"></i> Pedidos de Mercadería</h2>
+    <p class="text-muted mb-0">Importá una planilla, revisá los pedidos y exportá productos con stock de depósito mayor a 1.</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <label class="btn btn-primary btn-sm mb-0" for="archivoPedidos"><i class="bi bi-upload"></i> Importar Excel / CSV</label>
+    <input type="file" id="archivoPedidos" accept=".csv,.xlsx,.xls" hidden onchange="importarPedidos(event)">
+    <button class="btn btn-outline-success btn-sm" type="button" onclick="exportarStockPositivo()"><i class="bi bi-download"></i> Exportar stock &gt; 1</button>
+    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="cargarPedidos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+  </div>
+</div>
+
+<div class="card p-3 mb-4">
+  <div class="row g-2 align-items-center">
+    <div class="col-lg-5">
+      <input type="search" id="busquedaPedidos" class="form-control" placeholder="Buscar cliente, documento, clave o artículo..." oninput="filtrarPedidos()">
+    </div>
+    <div class="col-lg-7 text-lg-end">
+      <span class="badge bg-light text-dark border" id="resumenPedidos">0 registros</span>
+      <span class="small text-muted ms-2">Pendientes: stock depósito menor o igual a 0</span>
+    </div>
+  </div>
+</div>
+
+<div id="estadoImportacion" class="alert d-none" role="alert"></div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle" id="tablaPedidos">
+      <thead class="table-light">
+        <tr>
+          <th><input type="checkbox" id="chkTodosPedidos" onchange="seleccionarTodosPedidos(this.checked)"></th>
+          <th>Cliente</th><th>DNI / Código</th><th>Documento</th><th>Fecha venta</th>
+          <th>Clave / Artículo</th><th>Cantidad</th><th>Stock disponible</th><th>Stock depósito</th><th>Destino</th><th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoPedidos"><tr><td colspan="11" class="text-center py-4">Todavía no hay pedidos importados.</td></tr></tbody>
+    </table>
+  </div>
+</div>

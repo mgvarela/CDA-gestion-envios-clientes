@@ -84,7 +84,7 @@ function renderTablaEnvios() {
   tbody.innerHTML = '';
 
   if (clientesData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Sin clientes registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">Sin clientes registrados.</td></tr>';
     return;
   }
 
@@ -150,6 +150,10 @@ function renderTablaEnvios() {
     estadoBadge.textContent = sanitizeText(c.estado, 30) || 'sin aviso';
     estadoCell.appendChild(estadoBadge);
     tr.appendChild(estadoCell);
+
+    const fechaEnvioCell = document.createElement('td');
+    fechaEnvioCell.textContent = c.fecha_envio ? new Date(c.fecha_envio).toLocaleString('es-AR') : '-';
+    tr.appendChild(fechaEnvioCell);
 
     const accionesCell = document.createElement('td');
     accionesCell.className = 'text-center';

@@ -37,6 +37,48 @@ where updated_at is null;
 
 alter table public.profiles enable row level security;
 
+-- Pedidos de mercaderia importados desde Excel o CSV.
+create table if not exists public.pedidos_mercaderia (
+  id uuid primary key default gen_random_uuid(),
+  fila_origen integer,
+  cod_suc_vta text,
+  sucursal_vta text,
+  documento text,
+  fecha_venta text,
+  fecha_programada text,
+  clave text,
+  familia text,
+  articulo text,
+  cantidad numeric default 0,
+  st_disponible numeric default 0,
+  st_reservado numeric default 0,
+  cod_suc_ent text,
+  sucursal_ent text,
+  cod_cliente text,
+  cliente text,
+  confirmo text,
+  actualizado text,
+  st_depo numeric default 0,
+  estado text not null default 'pendiente',
+  fecha_envio timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- Compatibilidad con arrepentimientos creados antes de este modulo.
+create table if not exists public.arrepentimientos (
+  id uuid primary key default gen_random_uuid(),
+  fecha timestamptz default now(),
+  cliente_nombre text not null,
+  pedido_id text not null,
+  motivo text not null,
+  estado text not null default 'pendiente',
+  fecha_envio timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.arrepentimientos add column if not exists fecha_envio timestamptz;
+alter table public.arrepentimientos add column if not exists created_at timestamptz default now();
+
 -- La funcion evita consultar profiles desde una policy de profiles y caer en recursion.
 create or replace function public.current_user_role()
 returns text
@@ -120,6 +162,8 @@ alter table if exists public.admin_promos_bancarias
   add column if not exists created_at timestamptz not null default now();
 alter table if exists public.admin_novedades
   add column if not exists created_at timestamptz not null default now();
+alter table public.clientes
+  add column if not exists fecha_envio timestamptz;
 
 -- Activa RLS en todas las tablas usadas por la aplicacion.
 alter table if exists public.clientes enable row level security;
@@ -127,6 +171,8 @@ alter table if exists public.templates enable row level security;
 alter table if exists public.admin_promos enable row level security;
 alter table if exists public.admin_promos_bancarias enable row level security;
 alter table if exists public.admin_novedades enable row level security;
+alter table public.pedidos_mercaderia enable row level security;
+alter table public.arrepentimientos enable row level security;
 
 -- Lectura: cualquier usuario autenticado puede consultar la informacion operativa.
 drop policy if exists clientes_select_authenticated on public.clientes;
@@ -147,6 +193,14 @@ for select to authenticated using (true);
 
 drop policy if exists admin_novedades_select_authenticated on public.admin_novedades;
 create policy admin_novedades_select_authenticated on public.admin_novedades
+for select to authenticated using (true);
+
+drop policy if exists pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia;
+create policy pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia
+for select to authenticated using (true);
+
+drop policy if exists arrepentimientos_select_authenticated on public.arrepentimientos;
+create policy arrepentimientos_select_authenticated on public.arrepentimientos
 for select to authenticated using (true);
 
 -- Escritura: editor y admin.
@@ -205,6 +259,28 @@ for update to authenticated
 using (public.current_user_role() in ('editor', 'admin'))
 with check (public.current_user_role() in ('editor', 'admin'));
 
+drop policy if exists pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia;
+create policy pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia
+for insert to authenticated
+with check (public.current_user_role() in ('editor', 'admin'));
+
+drop policy if exists pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia;
+create policy pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia
+for update to authenticated
+using (public.current_user_role() in ('editor', 'admin'))
+with check (public.current_user_role() in ('editor', 'admin'));
+
+drop policy if exists arrepentimientos_insert_editor_admin on public.arrepentimientos;
+create policy arrepentimientos_insert_editor_admin on public.arrepentimientos
+for insert to authenticated
+with check (public.current_user_role() in ('editor', 'admin'));
+
+drop policy if exists arrepentimientos_update_editor_admin on public.arrepentimientos;
+create policy arrepentimientos_update_editor_admin on public.arrepentimientos
+for update to authenticated
+using (public.current_user_role() in ('editor', 'admin'))
+with check (public.current_user_role() in ('editor', 'admin'));
+
 -- Solo admin puede eliminar registros.
 drop policy if exists clientes_delete_admin on public.clientes;
 create policy clientes_delete_admin on public.clientes
@@ -224,6 +300,14 @@ for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists admin_novedades_delete_admin on public.admin_novedades;
 create policy admin_novedades_delete_admin on public.admin_novedades
+for delete to authenticated using (public.current_user_role() = 'admin');
+
+drop policy if exists pedidos_mercaderia_delete_admin on public.pedidos_mercaderia;
+create policy pedidos_mercaderia_delete_admin on public.pedidos_mercaderia
+for delete to authenticated using (public.current_user_role() = 'admin');
+
+drop policy if exists arrepentimientos_delete_admin on public.arrepentimientos;
+create policy arrepentimientos_delete_admin on public.arrepentimientos
 for delete to authenticated using (public.current_user_role() = 'admin');
 
 -- Refresca updated_at en perfiles modificados.

@@ -99,6 +99,8 @@ async function navegar(seccion, elementoLink) {
     // Disparar carga de datos según sección
     if (seccion === 'envios' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
     if (seccion === 'admin' && typeof cargarDatosAdmin === 'function') cargarDatosAdmin();
+    if (seccion === 'pedidos' && typeof cargarPedidos === 'function') cargarPedidos();
+    if (seccion === 'arrepentimiento' && typeof cargarArrepentimientos === 'function') cargarArrepentimientos();
 
   } catch (err) {
     mainContent.innerHTML = `<div class="alert alert-danger m-4">No se pudo cargar la sección. ${err.message}</div>`;

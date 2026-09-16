@@ -189,8 +189,15 @@ CREATE TABLE arrepentimientos (
   pedido_id TEXT NOT NULL,
   motivo TEXT NOT NULL,
   estado TEXT DEFAULT 'pendiente'
+  ,fecha_envio TIMESTAMPTZ
 );
 ```
+
+## Tabla `pedidos_mercaderia`
+
+La migración completa está en `supabase/permissions.sql`. Esta tabla recibe las columnas de la planilla de pedidos, permite importar archivos Excel/CSV desde el módulo **Pedidos de Mercadería** y aplica RLS para que solo usuarios `editor` o `admin` puedan importar datos.
+
+El botón **Exportar stock > 1** descarga un CSV con los registros cuyo `st_depo` sea superior a 1.
 
 ---
 
