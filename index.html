@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel de Control Multisección</title>
-  
+
   <!-- CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
@@ -14,299 +15,381 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 </head>
+
 <body>
 
-<!-- Pantalla de Login -->
-<div id="loginSection" class="auth-container">
-  <div class="card p-4">
-    <h3 class="text-center mb-3"><i class="bi bi-lock text-primary"></i> Iniciar Sesión</h3>
-    <form id="loginForm">
-      <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input type="email" id="loginEmail" class="form-control" required placeholder="tu@email.com">
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Contraseña</label>
-        <input type="password" id="loginPassword" class="form-control" required>
-      </div>
-      <button type="submit" class="btn btn-primary w-100">Ingresar</button>
-    </form>
-  </div>
-</div>
-
-<!-- Layout Principal -->
-<div id="appSection" class="container-fluid d-none p-0">
-  <div class="row g-0">
-    
-    <!-- Sidebar / Navegación -->
-    <nav class="col-md-3 col-lg-2 sidebar p-3">
-      <h5 class="text-white mb-4 ps-2"><i class="bi bi-speedometer2 me-2"></i> Control Hub</h5>
-      <ul class="nav flex-column">
-        <li class="nav-item">
-          <a class="nav-link active" href="#" onclick="navegar('secEnvios', this)">
-            <i class="bi bi-truck me-2"></i> Envíos y Pedidos
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#" onclick="navegar('secReviews', this)">
-            <i class="bi bi-star-fill me-2"></i> Solicitar Reviews
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#" onclick="navegar('secAdmin', this)">
-            <i class="bi bi-pie-chart me-2"></i> Admin Interno
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#" onclick="navegar('secArrepentimiento', this)">
-            <i class="bi bi-arrow-counterclockwise me-2"></i> Arrepentimiento
-          </a>
-        </li>
-      </ul>
-      <hr class="text-secondary">
-      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-
-      <!-- 1. SECCIÓN: GESTIÓN DE PEDIDOS Y ENVÍOS (COMPLETA RESTAURADA) -->
-      <section id="secEnvios" class="seccion-app">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
-          <div>
-            <button class="btn btn-outline-secondary me-2" onclick="cargarDatos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
-            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="bi bi-person-plus"></i> Nuevo Cliente</button>
-            <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalTemplates"><i class="bi bi-file-earmark-code"></i> Plantillas</button>
-          </div>
+  <!-- Pantalla de Login -->
+  <div id="loginSection" class="auth-container">
+    <div class="card p-4">
+      <h3 class="text-center mb-3"><i class="bi bi-lock text-primary"></i> Iniciar Sesión</h3>
+      <form id="loginForm">
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="loginEmail" class="form-control" required placeholder="tu@email.com">
         </div>
+        <div class="mb-3">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="loginPassword" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+      </form>
+    </div>
+  </div>
 
-        <div class="card p-3 mb-4">
-          <div class="row g-3 align-items-center">
-            <div class="col-md-4">
-              <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre, pedido o correo..." onkeyup="filtrarTabla()">
+  <!-- Layout Principal -->
+  <div id="appSection" class="container-fluid d-none p-0">
+    <div class="row g-0">
+
+      <!-- Sidebar / Navegación -->
+      <nav class="col-md-3 col-lg-2 sidebar p-3">
+        <h5 class="text-white mb-4 ps-2"><i class="bi bi-speedometer2 me-2"></i> Control Hub</h5>
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" onclick="navegar('secEnvios', this)">
+              <i class="bi bi-truck me-2"></i> Envíos y Pedidos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegar('secReviews', this)">
+              <i class="bi bi-star-fill me-2"></i> Solicitar Reviews
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegar('secAdmin', this)">
+              <i class="bi bi-pie-chart me-2"></i> Admin Interno
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegar('secArrepentimiento', this)">
+              <i class="bi bi-arrow-counterclockwise me-2"></i> Arrepentimiento
+            </a>
+          </li>
+        </ul>
+        <hr class="text-secondary">
+        <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i>
+          Salir</button>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+
+        <!-- 1. SECCIÓN: GESTIÓN DE PEDIDOS Y ENVÍOS (COMPLETA RESTAURADA) -->
+        <section id="secEnvios" class="seccion-app">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
+            <div>
+              <button class="btn btn-outline-secondary me-2" onclick="cargarDatos()"><i
+                  class="bi bi-arrow-clockwise"></i> Actualizar</button>
+              <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCliente"><i
+                  class="bi bi-person-plus"></i> Nuevo Cliente</button>
+              <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalTemplates"><i
+                  class="bi bi-file-earmark-code"></i> Plantillas</button>
             </div>
           </div>
-        </div>
 
-        <div class="card p-3">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Nombre</th>
-                  <th>Pedido</th>
-                  <th>Mail</th>
-                  <th width="240">Plantilla Asignada</th>
-                  <th>Enviar</th>
-                  <th>Estado</th>
-                  <th class="text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="tableBody">
-                <tr><td colspan="7" class="text-center py-4">Cargando datos...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- 2. SECCIÓN: REVIEWS -->
-      <section id="secReviews" class="seccion-app d-none">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2><i class="bi bi-star text-warning"></i> Solicitud de Reviews</h2>
-        </div>
-        <div class="card p-3">
-          <p class="text-muted mb-0">Módulo de gestión para envíos post-venta tipo Mercado Libre.</p>
-        </div>
-      </section>
-
-    <!-- SECCIÓN: ADMIN INTERNO (Promos & Novedades) -->
-<section id="secAdmin" class="seccion-app d-none">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-speedometer2 text-primary"></i> Dashboard de Promociones & Operaciones</h2>
-    <button class="btn btn-primary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i> Actualizar Dashboard</button>
-  </div>
-
-  <!-- Indicadores KPI Rápidos -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-3">
-      <div class="card p-3 bg-dark text-white border-start border-success border-4">
-        <small class="text-muted text-uppercase fw-bold">Promos Activas</small>
-        <h3 class="mb-0 text-success fw-bold" id="kpiPromosActivas">0</h3>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card p-3 bg-dark text-white border-start border-danger border-4">
-        <small class="text-muted text-uppercase fw-bold">Promos Inactivas</small>
-        <h3 class="mb-0 text-danger fw-bold" id="kpiPromosInactivas">0</h3>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card p-3 bg-dark text-white border-start border-warning border-4">
-        <small class="text-muted text-uppercase fw-bold">Promos Bancarias</small>
-        <h3 class="mb-0 text-warning fw-bold" id="kpiPromosBancarias">0</h3>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card p-3 bg-dark text-white border-start border-info border-4">
-        <small class="text-muted text-uppercase fw-bold">Novedades Operativas</small>
-        <h3 class="mb-0 text-info fw-bold" id="kpiNovedades">0</h3>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sub-pestañas para navegar entre Promos Web, Bancarias y Novedades -->
-  <ul class="nav nav-pills mb-3" id="adminTabs" role="tablist">
-    <li class="nav-item">
-      <button class="nav-link active" id="tab-promos" data-bs-toggle="pill" data-bs-target="#content-promos">📢 Promociones Web</button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-bancarias" data-bs-toggle="pill" data-bs-target="#content-bancarias">🏦 Promos Bancarias</button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-novedades" data-bs-toggle="pill" data-bs-target="#content-novedades">🚚 Novedades Operativas</button>
-    </li>
-  </ul>
-
-  <div class="tab-content">
-    <!-- 1. Tabla de Promos Web -->
-    <div class="tab-pane fade show active" id="content-promos">
-      <div class="card p-3">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th><th>Promo</th><th>Inicio</th><th>Fin</th><th>Landing</th><th>Canal</th><th>Observaciones</th><th>Estado</th>
-              </tr>
-            </thead>
-            <tbody id="tblAdminPromos">
-              <tr><td colspan="8" class="text-center py-3">Cargando promociones...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Tabla de Promos Bancarias -->
-    <div class="tab-pane fade" id="content-bancarias">
-      <div class="card p-3">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th><th>Banco</th><th>Descuento</th><th>Cuotas</th><th>Vigencia</th><th>Alcance</th><th>Estado</th>
-              </tr>
-            </thead>
-            <tbody id="tblAdminBancarias">
-              <tr><td colspan="7" class="text-center py-3">Cargando convenios bancarios...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Tabla de Novedades Operativas -->
-    <div class="tab-pane fade" id="content-novedades">
-      <div class="card p-3">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>ID</th><th>Categoría</th><th>Descripción</th><th>Activa</th>
-              </tr>
-            </thead>
-            <tbody id="tblAdminNovedades">
-              <tr><td colspan="4" class="text-center py-3">Cargando novedades...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-      <!-- 4. SECCIÓN: ARREPENTIMIENTO -->
-      <section id="secArrepentimiento" class="seccion-app d-none">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2><i class="bi bi-arrow-counterclockwise text-danger"></i> Solicitudes de Arrepentimiento</h2>
-        </div>
-        <div class="card p-3">
-          <p class="text-muted mb-0">Módulo de botón de arrepentimiento y bajas de compra.</p>
-        </div>
-      </section>
-
-    </main>
-  </div>
-</div>
-
-<!-- MODAL: NUEVO CLIENTE -->
-<div class="modal fade" id="modalCliente" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Agregar Nuevo Cliente</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="formCliente">
-          <div class="mb-3">
-            <label class="form-label">Nombre del Cliente</label>
-            <input type="text" id="newNombre" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Detalle del Pedido</label>
-            <input type="text" id="newPedido" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Correo Electrónico</label>
-            <input type="email" id="newMail" class="form-control" required>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" onclick="guardarCliente()">Guardar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: PLANTILLAS DE CORREO -->
-<div class="modal fade" id="modalTemplates" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Plantillas de Correo</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="formTemplate" class="mb-4">
-          <h6>Nueva Plantilla</h6>
-          <div class="row g-2 mb-2">
-            <div class="col-md-4">
-              <input type="text" id="tplId" class="form-control" placeholder="ID (ej: tpl_envio)" required>
-            </div>
-            <div class="col-md-8">
-              <input type="text" id="tplNombre" class="form-control" placeholder="Asunto del mail" required>
+          <div class="card p-3 mb-4">
+            <div class="row g-3 align-items-center">
+              <div class="col-md-4">
+                <input type="text" id="searchInput" class="form-control"
+                  placeholder="Buscar por nombre, pedido o correo..." onkeyup="filtrarTabla()">
+              </div>
             </div>
           </div>
-          <div class="mb-2">
-            <textarea id="tplCuerpo" class="form-control" rows="3" placeholder="Cuerpo del correo. Podés usar {{nombre}} y {{pedido}}" required></textarea>
+
+          <div class="card p-3">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Pedido</th>
+                    <th>Mail</th>
+                    <th width="240">Plantilla Asignada</th>
+                    <th>Enviar</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody">
+                  <tr>
+                    <td colspan="7" class="text-center py-4">Cargando datos...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <button type="button" class="btn btn-sm btn-dark" onclick="guardarTemplate()">Guardar Plantilla</button>
-        </form>
-        <h6>Plantillas Registradas</h6>
-        <ul class="list-group" id="listTemplates"></ul>
+        </section>
+
+        <!-- 2. SECCIÓN: REVIEWS -->
+        <section id="secReviews" class="seccion-app d-none">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2><i class="bi bi-star text-warning"></i> Solicitud de Reviews</h2>
+          </div>
+          <div class="card p-3">
+            <p class="text-muted mb-0">Módulo de gestión para envíos post-venta tipo Mercado Libre.</p>
+          </div>
+        </section>
+
+        <!-- SECCIÓN: ADMIN INTERNO (Promos & Novedades) -->
+        <section id="secAdmin" class="seccion-app d-none">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-speedometer2 text-primary"></i> Dashboard de Promociones & Operaciones</h2>
+            <button class="btn btn-primary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i>
+              Actualizar Dashboard</button>
+          </div>
+          <!-- Modal Nueva Promo -->
+          <div class="modal fade" id="modalNuevaPromo" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title"><i class="bi bi-plus-circle text-primary"></i> Nueva Promoción Web</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <form id="formNuevaPromo">
+                    <div class="mb-2">
+                      <label class="form-label">ID Promo</label>
+                      <input type="text" id="pId" class="form-control" placeholder="P004" required>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label">Nombre Promo</label>
+                      <input type="text" id="pNombre" class="form-control" placeholder="CyberMonday" required>
+                    </div>
+                    <div class="row g-2 mb-2">
+                      <div class="col-6">
+                        <label class="form-label">Fecha Inicio</label>
+                        <input type="datetime-local" id="pInicio" class="form-control" required>
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label">Fecha Fin</label>
+                        <input type="datetime-local" id="pFin" class="form-control" required>
+                      </div>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label">Landing URL</label>
+                      <input type="url" id="pLanding" class="form-control" placeholder="https://casadelaudio.com/..."
+                        required>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label">Observaciones</label>
+                      <textarea id="pObs" class="form-control" rows="2"></textarea>
+                    </div>
+                  </form>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="button" class="btn btn-primary" onclick="guardarNuevaPromo()">Guardar Promo</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Indicadores KPI Rápidos -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-3">
+              <div class="card p-3 bg-dark text-white border-start border-success border-4">
+                <small class="text-muted text-uppercase fw-bold">Promos Activas</small>
+                <h3 class="mb-0 text-success fw-bold" id="kpiPromosActivas">0</h3>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card p-3 bg-dark text-white border-start border-danger border-4">
+                <small class="text-muted text-uppercase fw-bold">Promos Inactivas</small>
+                <h3 class="mb-0 text-danger fw-bold" id="kpiPromosInactivas">0</h3>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card p-3 bg-dark text-white border-start border-warning border-4">
+                <small class="text-muted text-uppercase fw-bold">Promos Bancarias</small>
+                <h3 class="mb-0 text-warning fw-bold" id="kpiPromosBancarias">0</h3>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card p-3 bg-dark text-white border-start border-info border-4">
+                <small class="text-muted text-uppercase fw-bold">Novedades Operativas</small>
+                <h3 class="mb-0 text-info fw-bold" id="kpiNovedades">0</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pestañas para navegar entre Promos Web, Bancarias y Novedades -->
+          <ul class="nav nav-pills mb-3" id="adminTabs" role="tablist">
+            <li class="nav-item">
+              <button class="nav-link active" id="tab-promos" data-bs-toggle="pill" data-bs-target="#content-promos">📢
+                Promociones Web</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" id="tab-bancarias" data-bs-toggle="pill" data-bs-target="#content-bancarias">🏦
+                Promos Bancarias</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" id="tab-novedades" data-bs-toggle="pill" data-bs-target="#content-novedades">🚚
+                Novedades Operativas</button>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+            <!-- 1. Tabla de Promos Web -->
+            <div class="tab-pane fade show active" id="content-promos">
+              <div class="card p-3">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Promo</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Landing</th>
+                        <th>Canal</th>
+                        <th>Observaciones</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tblAdminPromos">
+                      <tr>
+                        <td colspan="8" class="text-center py-3">Cargando promociones...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Tabla de Promos Bancarias -->
+            <div class="tab-pane fade" id="content-bancarias">
+              <div class="card p-3">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Banco</th>
+                        <th>Descuento</th>
+                        <th>Cuotas</th>
+                        <th>Vigencia</th>
+                        <th>Alcance</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tblAdminBancarias">
+                      <tr>
+                        <td colspan="7" class="text-center py-3">Cargando convenios bancarios...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Tabla de Novedades Operativas -->
+            <div class="tab-pane fade" id="content-novedades">
+              <div class="card p-3">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Categoría</th>
+                        <th>Descripción</th>
+                        <th>Activa</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tblAdminNovedades">
+                      <tr>
+                        <td colspan="4" class="text-center py-3">Cargando novedades...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. SECCIÓN: ARREPENTIMIENTO -->
+        <section id="secArrepentimiento" class="seccion-app d-none">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2><i class="bi bi-arrow-counterclockwise text-danger"></i> Solicitudes de Arrepentimiento</h2>
+          </div>
+          <div class="card p-3">
+            <p class="text-muted mb-0">Módulo de botón de arrepentimiento y bajas de compra.</p>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVO CLIENTE -->
+  <div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Agregar Nuevo Cliente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formCliente">
+            <div class="mb-3">
+              <label class="form-label">Nombre del Cliente</label>
+              <input type="text" id="newNombre" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Detalle del Pedido</label>
+              <input type="text" id="newPedido" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Correo Electrónico</label>
+              <input type="email" id="newMail" class="form-control" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="guardarCliente()">Guardar</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Scripts Modulares -->
+  <!-- MODAL: PLANTILLAS DE CORREO -->
+  <div class="modal fade" id="modalTemplates" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Plantillas de Correo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formTemplate" class="mb-4">
+            <h6>Nueva Plantilla</h6>
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <input type="text" id="tplId" class="form-control" placeholder="ID (ej: tpl_envio)" required>
+              </div>
+              <div class="col-md-8">
+                <input type="text" id="tplNombre" class="form-control" placeholder="Asunto del mail" required>
+              </div>
+            </div>
+            <div class="mb-2">
+              <textarea id="tplCuerpo" class="form-control" rows="3"
+                placeholder="Cuerpo del correo. Podés usar {{nombre}} y {{pedido}}" required></textarea>
+            </div>
+            <button type="button" class="btn btn-sm btn-dark" onclick="guardarTemplate()">Guardar Plantilla</button>
+          </form>
+          <h6>Plantillas Registradas</h6>
+          <ul class="list-group" id="listTemplates"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts Modulares -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/envios.js"></script>
   <script src="js/admin.js"></script>
 </body>
+
 </html>

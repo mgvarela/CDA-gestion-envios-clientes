@@ -97,3 +97,29 @@ async function cargarNovedadesOperativas() {
     `;
   });
 }
+// 4. Nueva Promo
+async function guardarNuevaPromo() {
+  const id = document.getElementById('pId').value.trim();
+  const promo = document.getElementById('pNombre').value.trim();
+  const inicio = document.getElementById('pInicio').value;
+  const fin = document.getElementById('pFin').value;
+  const landing = document.getElementById('pLanding').value.trim();
+  const observaciones = document.getElementById('pObs').value.trim();
+
+  if (!id || !promo || !inicio || !fin) {
+    alert("Por favor completa los campos obligatorios.");
+    return;
+  }
+
+  const { error } = await supabaseClient.from('admin_promos').insert([{
+    id, promo, inicio, fin, landing, observaciones, estado: 'Activa', canal: 'web'
+  }]);
+
+  if (error) {
+    alert("Error al guardar la promo: " + error.message);
+  } else {
+    bootstrap.Modal.getInstance(document.getElementById('modalNuevaPromo')).hide();
+    document.getElementById('formNuevaPromo').reset();
+    cargarPromosWeb();
+  }
+}
