@@ -67,20 +67,44 @@ create table if not exists public.pedidos_mercaderia (
   created_at timestamptz not null default now()
 );
 
--- Compatibilidad con arrepentimientos creados antes de este modulo.
+-- Tabla de Solicitudes de Arrepentimiento
 create table if not exists public.arrepentimientos (
   id uuid primary key default gen_random_uuid(),
   fecha timestamptz default now(),
-  cliente_nombre text not null,
-  pedido_id text not null,
-  motivo text not null,
+  cliente_nombre text,
+  cliente_dni text,
+  cliente_telefono text,
+  cliente_email text,
+  cliente_mail text,
+  pedido_id text,
+  numero_pedido text,
+  pedido text,
+  motivo text,
+  comentario text,
   estado text not null default 'pendiente',
   fecha_envio timestamptz,
   created_at timestamptz not null default now()
 );
 
+-- Migraciones y compatibilidad de columnas para arrepentimientos
+alter table public.arrepentimientos alter column cliente_nombre drop not null;
+alter table public.arrepentimientos alter column motivo drop not null;
+alter table if exists public.arrepentimientos alter column cliente_mail drop not null;
+alter table if exists public.arrepentimientos alter column cliente_email drop not null;
+alter table if exists public.arrepentimientos alter column pedido_id drop not null;
+alter table if exists public.arrepentimientos alter column numero_pedido drop not null;
+
+alter table public.arrepentimientos add column if not exists cliente_dni text;
+alter table public.arrepentimientos add column if not exists cliente_telefono text;
+alter table public.arrepentimientos add column if not exists cliente_email text;
+alter table public.arrepentimientos add column if not exists cliente_mail text;
+alter table public.arrepentimientos add column if not exists pedido_id text;
+alter table public.arrepentimientos add column if not exists numero_pedido text;
+alter table public.arrepentimientos add column if not exists pedido text;
+alter table public.arrepentimientos add column if not exists comentario text;
 alter table public.arrepentimientos add column if not exists fecha_envio timestamptz;
 alter table public.arrepentimientos add column if not exists created_at timestamptz default now();
+
 alter table public.pedidos_mercaderia add column if not exists emails_destino text;
 alter table public.pedidos_mercaderia add column if not exists desde_hasta text;
 alter table public.pedidos_mercaderia add column if not exists tipo_plantilla text default 'pedido_mercaderia';
@@ -130,7 +154,6 @@ where not exists (
 on conflict (id) do nothing;
 
 -- Bootstrap del administrador principal.
--- Debe coincidir exactamente con el email registrado en Authentication > Users.
 update public.profiles
 set role = 'admin', updated_at = now()
 where id = (
@@ -139,7 +162,7 @@ where id = (
   limit 1
 );
 
--- Profiles: un usuario ve su perfil; un admin ve y modifica todos.
+-- Profiles policies
 drop policy if exists profiles_select_own_or_admin on public.profiles;
 create policy profiles_select_own_or_admin
 on public.profiles for select to authenticated
@@ -151,7 +174,6 @@ on public.profiles for update to authenticated
 using (public.current_user_role() = 'admin')
 with check (role in ('viewer', 'editor', 'admin'));
 
--- El alta de perfiles se realiza por el trigger; no se permite insertarlo desde el front.
 drop policy if exists profiles_insert_none on public.profiles;
 create policy profiles_insert_none
 on public.profiles for insert to authenticated
@@ -181,143 +203,94 @@ alter table if exists public.admin_novedades enable row level security;
 alter table public.pedidos_mercaderia enable row level security;
 alter table public.arrepentimientos enable row level security;
 
--- Lectura: cualquier usuario autenticado puede consultar la informacion operativa.
+-- Lectura
 drop policy if exists clientes_select_authenticated on public.clientes;
-create policy clientes_select_authenticated on public.clientes
-for select to authenticated using (true);
+create policy clientes_select_authenticated on public.clientes for select to authenticated using (true);
 
 drop policy if exists templates_select_authenticated on public.templates;
-create policy templates_select_authenticated on public.templates
-for select to authenticated using (true);
+create policy templates_select_authenticated on public.templates for select to authenticated using (true);
 
 drop policy if exists admin_promos_select_authenticated on public.admin_promos;
-create policy admin_promos_select_authenticated on public.admin_promos
-for select to authenticated using (true);
+create policy admin_promos_select_authenticated on public.admin_promos for select to authenticated using (true);
 
 drop policy if exists admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias
-for select to authenticated using (true);
+create policy admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias for select to authenticated using (true);
 
 drop policy if exists admin_novedades_select_authenticated on public.admin_novedades;
-create policy admin_novedades_select_authenticated on public.admin_novedades
-for select to authenticated using (true);
+create policy admin_novedades_select_authenticated on public.admin_novedades for select to authenticated using (true);
 
 drop policy if exists pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia
-for select to authenticated using (true);
+create policy pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia for select to authenticated using (true);
 
 drop policy if exists arrepentimientos_select_authenticated on public.arrepentimientos;
-create policy arrepentimientos_select_authenticated on public.arrepentimientos
-for select to authenticated using (true);
+create policy arrepentimientos_select_authenticated on public.arrepentimientos for select to authenticated using (true);
 
--- Escritura: editor y admin.
+-- Escritura: editor y admin
 drop policy if exists clientes_insert_editor_admin on public.clientes;
-create policy clientes_insert_editor_admin on public.clientes
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy clientes_insert_editor_admin on public.clientes for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists clientes_update_editor_admin on public.clientes;
-create policy clientes_update_editor_admin on public.clientes
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy clientes_update_editor_admin on public.clientes for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists templates_insert_editor_admin on public.templates;
-create policy templates_insert_editor_admin on public.templates
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy templates_insert_editor_admin on public.templates for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists templates_update_editor_admin on public.templates;
-create policy templates_update_editor_admin on public.templates
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy templates_update_editor_admin on public.templates for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists admin_promos_insert_editor_admin on public.admin_promos;
-create policy admin_promos_insert_editor_admin on public.admin_promos
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_insert_editor_admin on public.admin_promos for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists admin_promos_update_editor_admin on public.admin_promos;
-create policy admin_promos_update_editor_admin on public.admin_promos
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_update_editor_admin on public.admin_promos for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists admin_novedades_insert_editor_admin on public.admin_novedades;
-create policy admin_novedades_insert_editor_admin on public.admin_novedades
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_novedades_insert_editor_admin on public.admin_novedades for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists admin_novedades_update_editor_admin on public.admin_novedades;
-create policy admin_novedades_update_editor_admin on public.admin_novedades
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_novedades_update_editor_admin on public.admin_novedades for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists arrepentimientos_insert_editor_admin on public.arrepentimientos;
-create policy arrepentimientos_insert_editor_admin on public.arrepentimientos
-for insert to authenticated
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy arrepentimientos_insert_editor_admin on public.arrepentimientos for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
 
 drop policy if exists arrepentimientos_update_editor_admin on public.arrepentimientos;
-create policy arrepentimientos_update_editor_admin on public.arrepentimientos
-for update to authenticated
-using (public.current_user_role() in ('editor', 'admin'))
-with check (public.current_user_role() in ('editor', 'admin'));
+create policy arrepentimientos_update_editor_admin on public.arrepentimientos for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
 
--- Solo admin puede eliminar registros.
+-- Eliminacion: solo admin
 drop policy if exists clientes_delete_admin on public.clientes;
-create policy clientes_delete_admin on public.clientes
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy clientes_delete_admin on public.clientes for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists templates_delete_admin on public.templates;
-create policy templates_delete_admin on public.templates
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy templates_delete_admin on public.templates for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists admin_promos_delete_admin on public.admin_promos;
-create policy admin_promos_delete_admin on public.admin_promos
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy admin_promos_delete_admin on public.admin_promos for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists admin_promos_bancarias_delete_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_delete_admin on public.admin_promos_bancarias
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy admin_promos_bancarias_delete_admin on public.admin_promos_bancarias for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists admin_novedades_delete_admin on public.admin_novedades;
-create policy admin_novedades_delete_admin on public.admin_novedades
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy admin_novedades_delete_admin on public.admin_novedades for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists pedidos_mercaderia_delete_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_delete_admin on public.pedidos_mercaderia
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy pedidos_mercaderia_delete_admin on public.pedidos_mercaderia for delete to authenticated using (public.current_user_role() = 'admin');
 
 drop policy if exists arrepentimientos_delete_admin on public.arrepentimientos;
-create policy arrepentimientos_delete_admin on public.arrepentimientos
-for delete to authenticated using (public.current_user_role() = 'admin');
+create policy arrepentimientos_delete_admin on public.arrepentimientos for delete to authenticated using (public.current_user_role() = 'admin');
 
--- Refresca updated_at en perfiles modificados.
+-- Refresca updated_at
 create or replace function public.set_profiles_updated_at()
 returns trigger
 language plpgsql
@@ -329,12 +302,60 @@ end;
 $$;
 
 drop trigger if exists profiles_updated_at on public.profiles;
-create trigger profiles_updated_at
-before update on public.profiles
-for each row execute procedure public.set_profiles_updated_at();
+create trigger profiles_updated_at before update on public.profiles for each row execute procedure public.set_profiles_updated_at();
 
--- Comprobacion final: deberia devolver el usuario bootstrap con role = admin.
-select p.id, u.email, p.role
-from public.profiles p
-join auth.users u on u.id = p.id
-where lower(u.email) = lower('varelamatiasgerardo@gmail.com');
+-- Refrescar cache de esquemas
+notify pgrst, 'reload schema';
+
+
+-- 1. Tabla principal de Arrepentimientos consolidada
+create table if not exists public.arrepentimientos (
+  id uuid primary key default gen_random_uuid(),
+  fecha timestamptz default now(),
+  cliente_nombre text,
+  cliente_dni text,
+  cliente_telefono text,
+  cliente_email text,
+  cliente_mail text,
+  pedido_id text,
+  numero_pedido text,
+  pedido text,
+  motivo text,
+  comentario text,
+  estado text not null default 'Enviado a Caja',
+  estado_cliente text default 'Pendiente',
+  emails_destino text,
+  check_envio boolean default false,
+  fecha_envio timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- Migraciones sin romper datos
+alter table public.arrepentimientos add column if not exists estado_cliente text default 'Pendiente';
+alter table public.arrepentimientos add column if not exists emails_destino text;
+alter table public.arrepentimientos add column if not exists check_envio boolean default false;
+alter table public.arrepentimientos add column if not exists comentario text;
+
+-- 2. Tabla de Logs de Errores
+create table if not exists public.arrepentimientos_logs (
+  id uuid primary key default gen_random_uuid(),
+  fecha timestamptz default now(),
+  mensaje_error text not null,
+  referencia_fila text,
+  usuario_email text,
+  created_at timestamptz default now()
+);
+
+alter table public.arrepentimientos enable row level security;
+alter table public.arrepentimientos_logs enable row level security;
+
+-- Politicas RLS
+drop policy if exists arrepentimientos_logs_select_admin on public.arrepentimientos_logs;
+create policy arrepentimientos_logs_select_admin on public.arrepentimientos_logs
+for select to authenticated using (public.current_user_role() = 'admin');
+
+drop policy if exists arrepentimientos_logs_insert_authenticated on public.arrepentimientos_logs;
+create policy arrepentimientos_logs_insert_authenticated on public.arrepentimientos_logs
+for insert to authenticated with check (true);
+
+notify pgrst, 'reload schema';

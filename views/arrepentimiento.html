@@ -1,18 +1,104 @@
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
   <h2><i class="bi bi-arrow-counterclockwise text-danger"></i> Solicitudes de Arrepentimiento</h2>
-  <button class="btn btn-outline-secondary btn-sm" onclick="cargarArrepentimientos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+  <div class="d-flex flex-wrap gap-2">
+     <label class="btn btn-primary btn-sm mb-0" for="archivoArrepentimientos" data-role-action="write">
+      <i class="bi bi-file-earmark-arrow-up"></i> Importar CSV
+    </label>
+   
+    <button class="btn btn-outline-success btn-sm" onclick="exportarSeleccionadosArrepentimientosCSV()">
+      <i class="bi bi-check2-square"></i> Exportar Seleccionados
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="exportarArrepentimientosCSV()">
+      <i class="bi bi-download"></i> Exportar Todo
+    </button>
+    <input type="file" id="archivoArrepentimientos" accept=".csv,.xlsx,.xls" hidden onchange="importarArrepentimientosCSV(event)">
+   
+    <button class="btn btn-outline-secondary btn-sm" onclick="cargarArrepentimientos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+  
+   <button class="btn btn-outline-danger btn-sm" id="btnVerLogsArrepentimiento" data-admin-only="true" onclick="abrirLogsArrepentimiento()">
+      <i class="bi bi-bug"></i> Logs de Errores
+    </button>
+  </div>
 </div>
+
+<!-- BARRA DE FILTROS -->
+<div class="card p-3 mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col-md-4">
+      <input type="search" id="buscarArrepentimiento" class="form-control form-control-sm" placeholder="Buscar cliente, DNI, pedido o motivo..." oninput="filtrarArrepentimientos()">
+    </div>
+    <div class="col-md-3">
+      <select id="filtroEstadoArrepentimiento" class="form-select form-select-sm" onchange="filtrarArrepentimientos()">
+        <option value="">Todos los Estados</option>
+        <option value="Devuelve Sucursal">Devuelve Sucursal</option>
+        <option value="Retiro en domicilio">Retiro en domicilio</option>
+        <option value="Enviado a Caja">Enviado a Caja</option>
+        <option value="Otros">Otros</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select id="filtroEnvioArrepentimiento" class="form-select form-select-sm" onchange="filtrarArrepentimientos()">
+        <option value="">Todos los Envíos</option>
+        <option value="enviado">Enviados</option>
+        <option value="pendiente">Pendientes de Envío</option>
+      </select>
+    </div>
+    <div class="col-md-2 text-end">
+      <span class="badge bg-light text-dark border" id="resumenArrepentimientos">0 registros</span>
+    </div>
+  </div>
+</div>
+
+<!-- TABLA PRINCIPAL CON CONTENEDOR DE SCROLL OPTIMIZADO -->
 <div class="card p-3">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
+  <div class="table-scroll-container">
+    <table class="table table-hover align-middle mb-0" id="tablaArrepentimientos">
       <thead class="table-light">
         <tr>
-          <th>Cliente</th><th>Pedido</th><th>Motivo</th><th>Estado</th><th>Fecha y hora de envío</th>
+          <th width="40">Enviar</th>
+          <th>Cliente / DNI / Tel</th>
+          <th>Pedido</th>
+          <th class="col-motivo">Motivo</th>
+          <th>Comentarios (Interno)</th>
+          <th>Estado Pedido</th>
+          <th>Destinatarios Email</th>
+          <th>Estado Cliente</th>
+          <th>Fecha Envío</th>
+          <th class="text-end">Acciones</th>
         </tr>
       </thead>
       <tbody id="tblArrepentimientos">
-        <tr><td colspan="5" class="text-center py-4">Cargando solicitudes...</td></tr>
+        <tr><td colspan="10" class="text-center py-4">Cargando solicitudes...</td></tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- MODAL DE LOGS DE ERRORES (Solo Admin) -->
+<div class="modal fade" id="modalLogsArrepentimiento" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white py-2">
+        <h5 class="modal-title fs-6"><i class="bi bi-shield-exclamation text-warning me-2"></i>Logs de Errores de Procesamiento / Envíos</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+          <table class="table table-sm table-striped small mb-0">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Error Registrado</th>
+                <th>Fila/Ref</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody id="tblLogsArrepentimientoBody">
+              <tr><td colspan="4" class="text-center py-3">Cargando logs de auditoría...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

@@ -1,3 +1,7 @@
+// ==========================================
+// MÓDULO 1: PEDIDOS DE MERCADERÍA
+// ==========================================
+
 let pedidosMercaderia = [];
 
 const PEDIDOS_COLUMNAS = {
@@ -173,7 +177,9 @@ function renderizarPedidos() {
     return !query || searchable.includes(query);
   });
 
-  document.getElementById('resumenPedidos').textContent = `${visibles.length} registros`;
+  const resumen = document.getElementById('resumenPedidos');
+  if (resumen) resumen.textContent = `${visibles.length} registros`;
+
   if (!visibles.length) {
     tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4">No hay registros para mostrar.</td></tr>';
     return;
@@ -363,28 +369,389 @@ function mostrarEstadoPedidos(message, type) {
   alert.classList.remove('d-none');
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ==========================================
+// MÓDULO 2: SOLICITUDES DE ARREPENTIMIENTO
+// ==========================================
+
+let listaArrepentimientos = [];
+const GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyOHK_tiJJgVY9HffudGWQuyfCIIld70VpFg7d4EonvYe2dbOm30p8CAqm9rczkQv9R/exec";
+
 async function cargarArrepentimientos() {
   const tbody = document.getElementById('tblArrepentimientos');
   if (!tbody) return;
   if (typeof requireAuth === 'function' && !(await requireAuth())) return;
 
-  const { data, error } = await supabaseClient.from('arrepentimientos').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabaseClient
+    .from('arrepentimientos')
+    .select('*')
+    .order('created_at', { ascending: false });
+
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">No se pudieron cargar: ${escapeHtml(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">No se pudieron cargar: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = (data || []).map(item => `
-    <tr>
-      <td>${escapeHtml(item.cliente_nombre || '-')}</td>
-      <td>${escapeHtml(item.pedido_id || '-')}</td>
-      <td>${escapeHtml(item.motivo || '-')}</td>
-      <td><span class="badge bg-secondary">${escapeHtml(item.estado || 'pendiente')}</span></td>
-      <td>${item.fecha_envio ? new Date(item.fecha_envio).toLocaleString('es-AR') : '-'}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="5" class="text-center py-4">Sin solicitudes registradas.</td></tr>';
+  listaArrepentimientos = data || [];
+  renderizarArrepentimientos();
 }
 
+function renderizarArrepentimientos() {
+  const tbody = document.getElementById('tblArrepentimientos');
+  if (!tbody) return;
+
+  const q = (document.getElementById('buscarArrepentimiento')?.value || '').toLowerCase();
+  const filtroEstado = document.getElementById('filtroEstadoArrepentimiento')?.value || '';
+  const filtroEnvio = document.getElementById('filtroEnvioArrepentimiento')?.value || '';
+
+  const filtrados = listaArrepentimientos.filter(item => {
+    const searchable = [item.cliente_nombre, item.cliente_dni, item.pedido_id, item.numero_pedido, item.motivo, item.comentario].join(' ').toLowerCase();
+    const coincideTexto = !q || searchable.includes(q);
+    const coincideEstado = !filtroEstado || item.estado === filtroEstado;
+    const coincideEnvio = !filtroEnvio || (filtroEnvio === 'enviado' ? item.fecha_envio : !item.fecha_envio);
+    return coincideTexto && coincideEstado && coincideEnvio;
+  });
+
+  const resumenEl = document.getElementById('resumenArrepentimientos');
+  if (resumenEl) resumenEl.textContent = `${filtrados.length} registros`;
+
+  if (!filtrados.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4">Sin registros coincidentes.</td></tr>';
+    return;
+  }
+
+  const opcionesEstado = ['Devuelve Sucursal', 'Retiro en domicilio', 'Enviado a Caja', 'Otros', 'Cerrado'];
+
+  tbody.innerHTML = filtrados.map(item => {
+    const pId = item.pedido_id || item.numero_pedido || item.pedido || '-';
+    const emailTo = item.emails_destino || item.cliente_email || item.cliente_mail || '';
+    
+    return `
+      <tr data-id="${item.id}">
+        <td class="text-center">
+          <input type="checkbox" class="form-check-input chk-arrepentimiento" value="${item.id}" ${item.check_envio ? 'checked' : ''} onchange="actualizarArrepentimientoField('${item.id}', 'check_envio', this.checked)">
+        </td>
+        <td>
+          <strong>${escapeHtml(item.cliente_nombre || 'Sin nombre')}</strong><br>
+          <small class="text-muted">DNI: ${escapeHtml(item.cliente_dni || '-')} | Tel: ${escapeHtml(item.cliente_telefono || '-')}</small>
+        </td>
+        <td><strong>${escapeHtml(pId)}</strong></td>
+        <td class="col-motivo"><small>${escapeHtml(item.motivo || '-')}</small></td>
+        <td>
+          <input type="text" class="form-control form-control-sm" value="${escapeHtml(item.comentario || '')}" placeholder="Comentario interno..." onchange="actualizarArrepentimientoField('${item.id}', 'comentario', this.value)">
+        </td>
+        <td>
+          <select class="form-select form-select-sm" onchange="cambiarEstadoArrepentimiento('${item.id}', this.value)">
+            ${opcionesEstado.map(opt => `<option value="${opt}" ${item.estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+            ${!opcionesEstado.includes(item.estado) && item.estado ? `<option value="${escapeHtml(item.estado)}" selected>${escapeHtml(item.estado)}</option>` : ''}
+          </select>
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm" value="${escapeHtml(emailTo)}" placeholder="destino@casadelaudio.com" onchange="actualizarArrepentimientoField('${item.id}', 'emails_destino', this.value)">
+        </td>
+        <td><span class="badge ${item.estado_cliente === 'Notificado' ? 'bg-success' : 'bg-warning text-dark'}">${escapeHtml(item.estado_cliente || 'Pendiente')}</span></td>
+        <td><small>${item.fecha_envio ? new Date(item.fecha_envio).toLocaleString('es-AR') : '-'}</small></td>
+        <td class="text-end text-nowrap">
+          <button class="btn btn-primary btn-sm me-1" onclick="enviarMailArrepentimiento('${item.id}')" data-role-action="write" title="Enviar Notificación">
+            <i class="bi bi-send"></i>
+          </button>
+          <button class="btn btn-outline-danger btn-sm" onclick="eliminarArrepentimiento('${item.id}')" data-role-action="delete" title="Borrar fila">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (typeof applyRolePermissions === 'function') applyRolePermissions();
+}
+
+function filtrarArrepentimientos() {
+  renderizarArrepentimientos();
+}
+
+// IMPORTACIÓN CON NOTIFICACIÓN Y CONFIRMACIÓN INTEGRADAS
+async function importarArrepentimientosCSV(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canWrite === 'function' && !canWrite()) return mostrarNotificacion('No tenés permisos para importar solicitudes.', 'danger');
+
+  try {
+    const jsonRows = await leerArchivoPedidos(file);
+    if (!jsonRows || jsonRows.length === 0) return mostrarNotificacion('El archivo está vacío o no posee filas procesables.', 'warning');
+
+    const { data: existentesDB } = await supabaseClient.from('arrepentimientos').select('pedido_id, numero_pedido, pedido');
+    const setIDsBase = new Set((existentesDB || []).flatMap(x => [x.pedido_id, x.numero_pedido, x.pedido].filter(Boolean)));
+
+    const registrosNuevos = [];
+    const idsDuplicadosAlerta = [];
+
+    for (const row of jsonRows) {
+      const getVal = (keys) => {
+        const foundKey = Object.keys(row).find(k => keys.some(alias => normalizarClaveColumna(alias) === normalizarClaveColumna(k)));
+        return foundKey ? textoSeguro(row[foundKey]) : '';
+      };
+
+      const pedidoVal = getVal(['N° Orden de compra', 'Orden', 'Pedido', 'N° Pedido', 'N° Orden']) || 'S/N';
+      if (pedidoVal !== 'S/N' && setIDsBase.has(pedidoVal)) {
+        idsDuplicadosAlerta.push(pedidoVal);
+      }
+
+      const cliente = getVal(['Nombre y Apellido', 'Nombre', 'Cliente']);
+      const dni = getVal(['DNI', 'Documento']);
+      const tel = getVal(['Teléfono', 'Telefono', 'Tel']);
+      const email = getVal(['Email', 'Mail']);
+      const motivo1 = getVal(['Motivo 1', 'Motivo']);
+      const motivoDetalle = getVal(['Otros', 'Motivo 2']);
+      const comentarioVal = getVal(['Comentarios', 'Comentario']);
+
+      registrosNuevos.push({
+        cliente_nombre: cliente || 'Sin Nombre',
+        cliente_dni: dni || '',
+        cliente_telefono: tel || '',
+        cliente_email: email || '',
+        cliente_mail: email || '',
+        pedido_id: pedidoVal,
+        numero_pedido: pedidoVal,
+        pedido: pedidoVal,
+        motivo: [motivo1, motivoDetalle].filter(Boolean).join(' - ') || 'Arrepentimiento de compra',
+        comentario: comentarioVal || '',
+        estado: 'Enviado a Caja'
+      });
+    }
+
+    if (idsDuplicadosAlerta.length > 0) {
+      const confirmar = await confirmarAccionModal(
+        'Pedidos duplicados detectados',
+        `Se detectaron pedidos que ya existen en el sistema (${idsDuplicadosAlerta.slice(0, 3).join(', ')}...). ¿Deseas avanzar e importar de todas formas?`
+      );
+      if (!confirmar) return;
+    }
+
+    const { error } = await supabaseClient.from('arrepentimientos').insert(registrosNuevos);
+    if (error) throw error;
+
+    mostrarNotificacion(`Se importaron ${registrosNuevos.length} registros correctamente.`, 'success');
+    await cargarArrepentimientos();
+
+  } catch (err) {
+    mostrarNotificacion('Error al importar el archivo: ' + err.message, 'danger');
+  }
+}
+
+async function actualizarArrepentimientoField(id, field, value) {
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canWrite === 'function' && !canWrite()) return;
+
+  const item = listaArrepentimientos.find(x => String(x.id) === String(id));
+  if (item) item[field] = value;
+
+  const { error } = await supabaseClient.from('arrepentimientos').update({ [field]: value }).eq('id', id);
+  if (error) console.error('Error al actualizar en Supabase:', error);
+}
+
+// CAMBIO DE ESTADO CON MODAL INTEGRADO
+async function cambiarEstadoArrepentimiento(id, nuevoEstado) {
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canWrite === 'function' && !canWrite()) return;
+
+  const item = listaArrepentimientos.find(x => String(x.id) === String(id));
+  if (!item) return;
+
+  if (nuevoEstado === 'Cerrado') {
+    const pId = item.pedido_id || item.numero_pedido || item.pedido || 'S/N';
+    const confirmar = await confirmarAccionModal(
+      'Cerrar y Archivar Solicitud',
+      `La solicitud del pedido "${pId}" cambiará a 'Cerrado'. Se exportará al Google Sheet de histórico y se borrará de Supabase para liberar espacio. ¿Confirmar?`
+    );
+
+    if (!confirmar) {
+      renderizarArrepentimientos();
+      return;
+    }
+
+    try {
+      if (GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL && !GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL.includes('TU_SCRIPT_ID')) {
+        await fetch(GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item)
+        });
+      }
+
+      const { error } = await supabaseClient.from('arrepentimientos').delete().eq('id', id);
+      if (error) throw error;
+
+      mostrarNotificacion(`Pedido ${pId} cerrado y archivado correctamente.`, 'success');
+      await cargarArrepentimientos();
+      return;
+
+    } catch (err) {
+      mostrarNotificacion('Error al archivar el registro: ' + err.message, 'danger');
+      return;
+    }
+  }
+
+  await actualizarArrepentimientoField(id, 'estado', nuevoEstado);
+}
+
+// BORRADO CON MODAL INTEGRADO
+async function eliminarArrepentimiento(id) {
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canDelete === 'function' && !canDelete()) return mostrarNotificacion('No tenés permisos para eliminar registros.', 'danger');
+
+  const confirmar = await confirmarAccionModal('Eliminar Registro', '¿Estás seguro de eliminar este registro de arrepentimiento?');
+  if (!confirmar) return;
+
+  const { error } = await supabaseClient.from('arrepentimientos').delete().eq('id', id);
+  if (error) return mostrarNotificacion('Error al borrar: ' + error.message, 'danger');
+
+  listaArrepentimientos = listaArrepentimientos.filter(x => String(x.id) !== String(id));
+  mostrarNotificacion('Registro eliminado correctamente.', 'success');
+  renderizarArrepentimientos();
+}
+// EXPORTAR SELECCIONADOS
+function exportarSeleccionadosArrepentimientosCSV() {
+  const seleccionadosIDs = Array.from(document.querySelectorAll('.chk-arrepentimiento:checked')).map(chk => chk.value);
+  if (!seleccionadosIDs.length) return mostrarNotificacion('Seleccioná al menos un registro con la casilla izquierda.', 'warning');
+
+  const filtrados = listaArrepentimientos.filter(item => seleccionadosIDs.includes(String(item.id)));
+  generarDescargaCSVArrepentimiento(filtrados, `arrepentimientos_seleccionados_${new Date().toISOString().slice(0,10)}.csv`);
+  mostrarNotificacion('Archivo CSV generado con éxito.', 'success');
+}
+
+function exportarArrepentimientosCSV() {
+  if (!listaArrepentimientos.length) return alert('No hay datos para exportar.');
+  generarDescargaCSVArrepentimiento(listaArrepentimientos, `arrepentimientos_todos_${new Date().toISOString().slice(0,10)}.csv`);
+}
+
+function generarDescargaCSVArrepentimiento(datos, nombreArchivo) {
+  const headers = ['Cliente', 'DNI', 'Telefono', 'Email', 'Pedido', 'Motivo', 'Comentario Interno', 'Estado Pedido', 'Emails Destino', 'Estado Cliente', 'Fecha Envío'];
+  const csvRows = [
+    headers.join(';'),
+    ...datos.map(item => [
+      csvEscape(item.cliente_nombre || ''),
+      csvEscape(item.cliente_dni || ''),
+      csvEscape(item.cliente_telefono || ''),
+      csvEscape(item.cliente_email || item.cliente_mail || ''),
+      csvEscape(item.pedido_id || item.numero_pedido || item.pedido || ''),
+      csvEscape(item.motivo || ''),
+      csvEscape(item.comentario || ''),
+      csvEscape(item.estado || ''),
+      csvEscape(item.emails_destino || ''),
+      csvEscape(item.estado_cliente || 'Pendiente'),
+      csvEscape(item.fecha_envio ? new Date(item.fecha_envio).toLocaleString('es-AR') : '')
+    ].join(';'))
+  ];
+
+  const blob = new Blob(['\ufeff' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivo;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function enviarMailArrepentimiento(id) {
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canWrite === 'function' && !canWrite()) return alert('No tenés permisos.');
+
+  const item = listaArrepentimientos.find(x => String(x.id) === String(id));
+  if (!item) return;
+
+  const destino = item.emails_destino || item.cliente_email || item.cliente_mail;
+  if (!destino || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destino.trim())) {
+    const errorMsg = `No hay un email de destino válido: ${destino || 'Vacio'}`;
+    alert(errorMsg);
+    await registrarErrorArrepentimiento(errorMsg, `Pedido ${item.pedido_id || 'S/N'}`);
+    return;
+  }
+
+  try {
+    const pId = item.pedido_id || item.numero_pedido || item.pedido || 'S/N';
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      email_destino: destino.trim(),
+      asunto: `Gestión de Solicitud de Arrepentimiento - Orden ${pId}`,
+      mensaje: `Hola ${item.cliente_nombre || ''},\n\nTu solicitud de arrepentimiento para el pedido ${pId} fue gestionada.\nEstado: ${item.estado || '-'}\nComentarios: ${item.comentario || '-'}`
+    });
+
+    const now = new Date().toISOString();
+    await supabaseClient.from('arrepentimientos').update({
+      fecha_envio: now,
+      estado_cliente: 'Notificado',
+      check_envio: true
+    }).eq('id', id);
+
+    item.fecha_envio = now;
+    item.estado_cliente = 'Notificado';
+    item.check_envio = true;
+
+    alert('Email enviado con éxito.');
+    renderizarArrepentimientos();
+
+  } catch (err) {
+    const errorStr = err.message || JSON.stringify(err);
+    alert('Error al enviar correo: ' + errorStr);
+    await registrarErrorArrepentimiento(errorStr, `Pedido ${item.pedido_id || 'S/N'}`);
+  }
+}
+
+async function registrarErrorArrepentimiento(mensaje, referencia) {
+  try {
+    const session = (await supabaseClient.auth.getSession()).data.session;
+    await supabaseClient.from('arrepentimientos_logs').insert([{
+      mensaje_error: mensaje,
+      referencia_fila: referencia,
+      usuario_email: session?.user?.email || 'sistema'
+    }]);
+  } catch (e) {
+    console.error('Error guardando log de error:', e);
+  }
+}
+
+async function abrirLogsArrepentimiento() {
+  if (currentUserRole !== 'admin') return alert('Acceso exclusivo para administradores.');
+
+  const tbody = document.getElementById('tblLogsArrepentimientoBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando logs...</td></tr>';
+
+  const modalEl = document.getElementById('modalLogsArrepentimiento');
+  if (modalEl) new bootstrap.Modal(modalEl).show();
+
+  const { data, error } = await supabaseClient.from('arrepentimientos_logs').select('*').order('created_at', { ascending: false }).limit(50);
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error: ${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = (data || []).map(log => `
+    <tr>
+      <td>${new Date(log.created_at || log.fecha).toLocaleString('es-AR')}</td>
+      <td class="text-danger fw-bold">${escapeHtml(log.mensaje_error)}</td>
+      <td><code>${escapeHtml(log.referencia_fila || '-')}</code></td>
+      <td>${escapeHtml(log.usuario_email || '-')}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" class="text-center py-3">Sin errores registrados.</td></tr>';
+}
+
+// EXPOSICIÓN GLOBAL
 window.cargarPedidos = cargarPedidos;
 window.importarPedidos = importarPedidos;
 window.exportarStockPositivo = exportarStockPositivo;
@@ -393,4 +760,14 @@ window.seleccionarTodosPedidos = seleccionarTodosPedidos;
 window.guardarCambiosPedido = guardarCambiosPedido;
 window.enviarPedido = enviarPedido;
 window.enviarPedidosSeleccionados = enviarPedidosSeleccionados;
+
 window.cargarArrepentimientos = cargarArrepentimientos;
+window.filtrarArrepentimientos = filtrarArrepentimientos;
+window.importarArrepentimientosCSV = importarArrepentimientosCSV;
+window.actualizarArrepentimientoField = actualizarArrepentimientoField;
+window.cambiarEstadoArrepentimiento = cambiarEstadoArrepentimiento;
+window.eliminarArrepentimiento = eliminarArrepentimiento;
+window.exportarSeleccionadosArrepentimientosCSV = exportarSeleccionadosArrepentimientosCSV;
+window.exportarArrepentimientosCSV = exportarArrepentimientosCSV;
+window.enviarMailArrepentimiento = enviarMailArrepentimiento;
+window.abrirLogsArrepentimiento = abrirLogsArrepentimiento;

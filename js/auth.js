@@ -221,3 +221,70 @@ async function logout() {
 }
 
 window.onload = checkUser;
+
+// HELPER DE NOTIFICACIONES DENTRO DEL PROYECTO (Sin alert JS)
+function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return alert(mensaje); // Fallback de seguridad
+
+  const toast = document.createElement('div');
+  const tipoClase = tipo === 'error' || tipo === 'danger' ? 'danger' : (tipo === 'success' ? 'success' : (tipo === 'warning' ? 'warning' : 'info'));
+  
+  toast.className = `alert alert-${tipoClase} alert-dismissible fade show`;
+  toast.role = 'alert';
+  toast.innerHTML = `
+    <div class="d-flex align-items-center small">
+      <i class="bi bi-info-circle-fill me-2 fs-6"></i>
+      <div>${escapeHtml(mensaje)}</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 200);
+  }, duracion);
+}
+
+// HELPER DE CONFIRMACIÓN MEDIANTE MODAL BOOTSTRAP (Sin confirm JS)
+function confirmarAccionModal(titulo, mensaje) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById('modalConfirmacionGlobal');
+    if (!modalEl) {
+      resolve(confirm(mensaje));
+      return;
+    }
+
+    document.getElementById('modalConfirmacionTitulo').textContent = titulo;
+    document.getElementById('modalConfirmacionMensaje').textContent = mensaje;
+
+    const bsModal = new bootstrap.Modal(modalEl);
+    const btnAceptar = document.getElementById('btnModalConfirmarAceptar');
+
+    const handleAceptar = () => {
+      cleanup();
+      bsModal.hide();
+      resolve(true);
+    };
+
+    const handleHidden = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const cleanup = () => {
+      btnAceptar.removeEventListener('click', handleAceptar);
+      modalEl.removeEventListener('hidden.bs.modal', handleHidden);
+    };
+
+    btnAceptar.addEventListener('click', handleAceptar);
+    modalEl.addEventListener('hidden.bs.modal', handleHidden, { once: true });
+
+    bsModal.show();
+  });
+}
+
+window.mostrarNotificacion = mostrarNotificacion;
+window.confirmarAccionModal = confirmarAccionModal;

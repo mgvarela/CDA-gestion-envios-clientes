@@ -1,5 +1,4 @@
 :root {
-
   --bs-primary: var(--color-cda-principal);
   --bs-primary-rgb: 30, 58, 138;
   --bs-secondary: #475569;
@@ -16,10 +15,25 @@
   --color-red: #ef4444;
 }
 
+/* Base tipográfica y densidad operativa */
 body {
   background-color: #f8f9fa;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 0.875rem; /* 14px base */
+  line-height: 1.4;
   padding-bottom: 40px;
+}
+
+/* Jerarquía de encabezados escalada para dashboard */
+h1, .h1 { font-size: 1.4rem !important; }
+h2, .h2 { font-size: 1.2rem !important; }
+h3, .h3 { font-size: 1.05rem !important; }
+h4, .h4 { font-size: 0.95rem !important; }
+h5, .h5 { font-size: 0.875rem !important; }
+h6, .h6 { font-size: 0.8rem !important; }
+
+.bg-secondary {
+  background-color: #e2e3e5 !important;
 }
 
 #appSection > .row {
@@ -29,6 +43,7 @@ body {
   min-height: 100vh;
 }
 
+/* Layout Sidebar */
 .sidebar {
   flex: 0 0 240px;
   max-width: 240px;
@@ -68,6 +83,7 @@ body {
   border-radius: 6px;
 }
 
+/* Modo Compacto Sidebar */
 #appSection.sidebar-compact .sidebar {
   flex-basis: 76px;
   max-width: 76px;
@@ -125,7 +141,7 @@ body {
 
 .sidebar .nav-link {
   color: var(--color-white);
-  font-size: 0.95rem;
+  font-size: 13px;
   margin-bottom: 4px;
 }
 
@@ -136,10 +152,15 @@ body {
   border-radius: 6px;
 }
 
+/* Componentes UI, Cards & Badges */
 .card {
   border-radius: 12px;
   border: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.card-body {
+  padding: 0.85rem;
 }
 
 .badge-sin-aviso {
@@ -167,9 +188,8 @@ body {
   margin: 80px auto;
 }
 
-/* ADMIN KPI */
 .row.g-3.mb-4 small {
-  color: var(--color-white)
+  color: var(--color-white);
 }
 
 .img-logo {
@@ -179,7 +199,102 @@ body {
   display: block;
 }
 
-/* Adaptabilidad Móvil */
+/* Optimización para Tablas */
+.table {
+  font-size: 0.8125rem; /* 13px para datos de tabla */
+  margin-bottom: 0;
+}
+
+.table th,
+.table td {
+  padding: 0.45rem 0.6rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table td.cell-wrap,
+.table .cell-wrap {
+  white-space: normal;
+  min-width: 180px;
+}
+
+#tablaArrepentimientos th.col-motivo,
+#tablaArrepentimientos td.col-motivo {
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.table-responsive {
+  border-radius: 0.375rem;
+  border: 1px solid #e2e8f0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table .btn-sm {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.table .badge {
+  font-size: 0.7rem;
+  padding: 0.3em 0.5em;
+}
+
+.form-select-sm,
+.col-plantilla,
+.col-planilla,
+.table th.col-plantilla,
+.table td.col-plantilla,
+.table th.col-planilla,
+.table td.col-planilla {
+  min-width: 170px !important;
+  width: 170px !important;
+  white-space: nowrap;
+}
+
+/* Scrollbar y altura optimizada para tablas extensas */
+.table-scroll-container {
+  max-height: 60vh;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.table-scroll-container table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f8fafc;
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 #e2e8f0;
+}
+
+
+/* Contenedor de notificaciones flotantes integradas (Toasts) */
+#toastContainer {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1090;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 380px;
+  width: 100%;
+  pointer-events: none;
+}
+
+#toastContainer .alert {
+  pointer-events: auto;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  margin-bottom: 0;
+}
+/* Adaptabilidad Móvil y Pantallas Pequeñas (< 768px) */
 @media (max-width: 767.98px) {
   #appSection > .row {
     display: block;
@@ -257,7 +372,12 @@ body {
   }
 
   .table-responsive {
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.35rem 0.45rem;
   }
 
   .nav-pills .nav-link {
@@ -266,6 +386,6 @@ body {
   }
 
   .card h3 {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
 }

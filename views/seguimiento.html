@@ -8,18 +8,22 @@
   </div>
 </div>
 
-<!-- BUSCADOR DE LOGÍSTICA POR FACTURA (DISPATCHTRACK) -->
+<!-- BUSCADOR MULTI-PROVEEDOR LOGÍSTICO -->
 <div class="card p-3 mb-4 border-start border-4 border-primary shadow-sm">
-  <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-truck text-primary me-1"></i> Consulta de Estado de Entrega (DispatchTrack)</h6>
+  <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-truck text-primary me-1"></i> Consulta de Estado de Entrega Multilogística</h6>
   <div class="row g-2 align-items-center">
-    <div class="col-md-5 col-lg-4">
+    <div class="col-md-6 col-lg-5">
       <div class="input-group input-group-sm">
-        <input type="text" id="inputFactura" class="form-control" placeholder="Ingrese N° de Factura..." onkeyup="if(event.key === 'Enter') buscarEstadoPorFactura()">
+        <select class="form-select" id="selectProveedor" style="max-width: 150px;">
+          <option value="dispatchtrack" selected>DispatchTrack</option>
+          <option value="flex">Mercado Flex</option>
+        </select>
+        <input type="text" id="inputFactura" class="form-control" placeholder="N° Factura o Envío..." onkeyup="if(event.key === 'Enter') buscarEstadoPorFactura()">
         <button class="btn btn-primary" onclick="buscarEstadoPorFactura()"><i class="bi bi-search"></i> Buscar</button>
       </div>
     </div>
-    <div class="col-md-7 col-lg-8" id="resultadoLogistica">
-      <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Ingresá el número de comprobante y presioná Buscar para ver los datos del contacto y la entrega.</small>
+    <div class="col-md-6 col-lg-7" id="resultadoLogistica">
+      <small class="text-muted"><i class="bi bi-info-circle me-1"></i> Seleccioná el operador logístico e ingresá el comprobante para ver los datos del contacto.</small>
     </div>
   </div>
 </div>
