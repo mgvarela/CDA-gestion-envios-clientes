@@ -3,6 +3,32 @@
 // ==========================================
 
 let pedidosMercaderia = [];
+let plantillasEmailData = [];
+
+async function cargarPlantillasEmail() {
+  const { data, error } = await supabaseClient.from('templates').select('*').order('nombre');
+  if (error) {
+    console.error('No se pudieron cargar las plantillas:', error.message);
+    return [];
+  }
+  plantillasEmailData = data || [];
+  const bulkTemplate = document.getElementById('bulkPlantillaPedido');
+  if (bulkTemplate) {
+    bulkTemplate.innerHTML = '<option value="">Cambiar plantilla...</option>' + plantillasEmailData
+      .map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.nombre || template.id)}</option>`)
+      .join('');
+  }
+  return plantillasEmailData;
+}
+
+function opcionesPlantillasEmail(templateId) {
+  const options = ['<option value="">Seleccionar plantilla...</option>'];
+  plantillasEmailData.forEach(template => {
+    const selected = String(template.id) === String(templateId || '') ? ' selected' : '';
+    options.push(`<option value="${escapeHtml(template.id)}"${selected}>${escapeHtml(template.nombre || template.id)}</option>`);
+  });
+  return options.join('');
+}
 
 const PEDIDOS_COLUMNAS = {
   cod_suc_vta: ['Cod_Suc_Vta', 'Cod Suc Vta'],
@@ -71,6 +97,7 @@ async function cargarPedidos() {
   const tbody = document.getElementById('cuerpoPedidos');
   if (!tbody) return;
 
+  await cargarPlantillasEmail();
   const { data, error } = await supabaseClient.from('pedidos_mercaderia').select('*').order('created_at', { ascending: false });
   if (error) {
     mostrarEstadoPedidos(`No se pudieron cargar los pedidos: ${error.message}`, 'danger');
@@ -199,9 +226,7 @@ function renderizarPedidos() {
       <td><input class="form-control form-control-sm" id="desde-${pedido.id}" value="${escapeHtml(pedido.desde_hasta || '')}" onchange="guardarCambiosPedido('${pedido.id}')"></td>
       <td>
         <select class="form-select form-select-sm" id="plantilla-${pedido.id}" onchange="guardarCambiosPedido('${pedido.id}')">
-          <option value="pedido_mercaderia" ${pedido.tipo_plantilla === 'pedido_mercaderia' ? 'selected' : ''}>Pedido de mercadería</option>
-          <option value="reorganizacion_entrega" ${pedido.tipo_plantilla === 'reorganizacion_entrega' ? 'selected' : ''}>Aviso reorganización entrega</option>
-          <option value="sin_stock_cliente" ${pedido.tipo_plantilla === 'sin_stock_cliente' ? 'selected' : ''}>Aviso sin stock a cliente</option>
+          ${opcionesPlantillasEmail(pedido.template_id || pedido.tipo_plantilla)}
         </select>
       </td>
       <td><span class="badge ${pedido.estado === 'enviado' ? 'bg-success' : 'bg-warning text-dark'}">${escapeHtml(pedido.estado || 'pendiente')}</span></td>
@@ -211,6 +236,47 @@ function renderizarPedidos() {
   `).join('');
 
   if (typeof applyRolePermissions === 'function') applyRolePermissions();
+}
+
+async function aplicarCambiosMasivosPedidos() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canWrite()) return;
+
+  const ids = Array.from(document.querySelectorAll('.pedido-checkbox:checked')).map(input => input.value);
+  const estado = document.getElementById('bulkEstadoPedido')?.value || '';
+  const templateId = document.getElementById('bulkPlantillaPedido')?.value || '';
+  if (!ids.length) return mostrarEstadoPedidos('Seleccioná al menos un pedido.', 'warning');
+  if (!estado && !templateId) return mostrarEstadoPedidos('Elegí un estado o plantilla para aplicar.', 'warning');
+
+  const cambios = {};
+  if (estado) cambios.estado = estado;
+  if (templateId) cambios.template_id = templateId;
+  const { error } = await supabaseClient.from('pedidos_mercaderia').update(cambios).in('id', ids);
+  if (error) return mostrarEstadoPedidos(`No se pudieron aplicar los cambios: ${error.message}`, 'danger');
+
+  pedidosMercaderia.forEach(pedido => {
+    if (ids.includes(String(pedido.id))) Object.assign(pedido, cambios);
+  });
+  document.getElementById('bulkEstadoPedido').value = '';
+  document.getElementById('bulkPlantillaPedido').value = '';
+  renderizarPedidos();
+  mostrarEstadoPedidos(`Se actualizaron ${ids.length} pedidos.`, 'success');
+}
+
+async function eliminarPedidosSeleccionados() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const ids = Array.from(document.querySelectorAll('.pedido-checkbox:checked')).map(input => input.value);
+  if (!ids.length) return mostrarEstadoPedidos('Seleccioná al menos un pedido.', 'warning');
+  if (!confirm(`¿Eliminar los ${ids.length} pedidos seleccionados?`)) return;
+
+  const { error } = await supabaseClient.from('pedidos_mercaderia').delete().in('id', ids);
+  if (error) return mostrarEstadoPedidos(`No se pudieron eliminar los pedidos: ${error.message}`, 'danger');
+
+  pedidosMercaderia = pedidosMercaderia.filter(pedido => !ids.includes(String(pedido.id)));
+  renderizarPedidos();
+  mostrarEstadoPedidos(`Se eliminaron ${ids.length} pedidos.`, 'success');
 }
 
 function filtrarPedidos() {
@@ -231,8 +297,8 @@ function obtenerCambiosPedido(pedido) {
   const tipoPlantilla = document.getElementById(`plantilla-${pedido.id}`)?.value || 'pedido_mercaderia';
   pedido.emails_destino = emails;
   pedido.desde_hasta = desdeHasta;
-  pedido.tipo_plantilla = tipoPlantilla;
-  return { emails_destino: emails, desde_hasta: desdeHasta, tipo_plantilla: tipoPlantilla };
+  pedido.template_id = tipoPlantilla;
+  return { emails_destino: emails, desde_hasta: desdeHasta, template_id: tipoPlantilla };
 }
 
 async function guardarCambiosPedido(id) {
@@ -290,7 +356,8 @@ async function enviarPedido(id) {
   if (boton) boton.disabled = true;
 
   try {
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    const templateId = pedido.template_id || EMAILJS_TEMPLATE_ID;
+    await emailjs.send(EMAILJS_SERVICE_ID, templateId, {
       email_destino: emails[0],
       email_cc: emails.slice(1).join(','),
       asunto: `Solicitud de mercadería - Pedido ${pedido.documento || '-'}`,
@@ -302,6 +369,7 @@ async function enviarPedido(id) {
       emails_destino: emails.join(', '),
       desde_hasta: pedido.desde_hasta,
       tipo_plantilla: pedido.tipo_plantilla,
+      template_id: pedido.template_id || '',
       estado: 'enviado',
       fecha_envio: fechaEnvio
     }).eq('id', id);
@@ -384,6 +452,13 @@ function escapeHtml(str) {
 // ==========================================
 
 let listaArrepentimientos = [];
+const canalesArrepentimiento = [
+  { value: 'web', label: 'Web' },
+  { value: 'mercado libre', label: 'Mercado Libre' },
+  { value: 'tienda icbc', label: 'Tienda ICBC' },
+  { value: 'provincia', label: 'Provincia' }
+];
+
 const GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyOHK_tiJJgVY9HffudGWQuyfCIIld70VpFg7d4EonvYe2dbOm30p8CAqm9rczkQv9R/exec";
 
 async function cargarArrepentimientos() {
@@ -391,13 +466,14 @@ async function cargarArrepentimientos() {
   if (!tbody) return;
   if (typeof requireAuth === 'function' && !(await requireAuth())) return;
 
+  await cargarPlantillasEmail();
   const { data, error } = await supabaseClient
     .from('arrepentimientos')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">No se pudieron cargar: ${escapeHtml(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger">No se pudieron cargar: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
 
@@ -414,7 +490,7 @@ function renderizarArrepentimientos() {
   const filtroEnvio = document.getElementById('filtroEnvioArrepentimiento')?.value || '';
 
   const filtrados = listaArrepentimientos.filter(item => {
-    const searchable = [item.cliente_nombre, item.cliente_dni, item.pedido_id, item.numero_pedido, item.motivo, item.comentario].join(' ').toLowerCase();
+    const searchable = [item.cliente_nombre, item.cliente_dni, item.pedido_id, item.numero_pedido,  item.motivo, item.otro, item.comentario,item.canal].join(' ').toLowerCase();
     const coincideTexto = !q || searchable.includes(q);
     const coincideEstado = !filtroEstado || item.estado === filtroEstado;
     const coincideEnvio = !filtroEnvio || (filtroEnvio === 'enviado' ? item.fecha_envio : !item.fecha_envio);
@@ -425,7 +501,7 @@ function renderizarArrepentimientos() {
   if (resumenEl) resumenEl.textContent = `${filtrados.length} registros`;
 
   if (!filtrados.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4">Sin registros coincidentes.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="text-center py-4">Sin registros coincidentes.</td></tr>';
     return;
   }
 
@@ -434,11 +510,15 @@ function renderizarArrepentimientos() {
   tbody.innerHTML = filtrados.map(item => {
     const pId = item.pedido_id || item.numero_pedido || item.pedido || '-';
     const emailTo = item.emails_destino || item.cliente_email || item.cliente_mail || '';
+    const canalActual = item.canal || '';
+    const opcionesCanal = canalesArrepentimiento.some(canal => canal.value === canalActual)
+      ? canalesArrepentimiento
+      : [...canalesArrepentimiento, { value: canalActual, label: canalActual }];
     
     return `
       <tr data-id="${item.id}">
         <td class="text-center">
-          <input type="checkbox" class="form-check-input chk-arrepentimiento" value="${item.id}" ${item.check_envio ? 'checked' : ''} onchange="actualizarArrepentimientoField('${item.id}', 'check_envio', this.checked)">
+          <input type="checkbox" class="form-check-input chk-arrepentimiento" value="${item.id}">
         </td>
         <td>
           <strong>${escapeHtml(item.cliente_nombre || 'Sin nombre')}</strong><br>
@@ -446,8 +526,22 @@ function renderizarArrepentimientos() {
         </td>
         <td><strong>${escapeHtml(pId)}</strong></td>
         <td class="col-motivo"><small>${escapeHtml(item.motivo || '-')}</small></td>
+        <td class="col-otro">
+          <input type="text" class="form-control form-control-sm" value="${escapeHtml(item.otro || '')}" placeholder="Otro..." onchange="actualizarArrepentimientoField('${item.id}', 'otro', this.value)">
+        </td>
         <td>
           <input type="text" class="form-control form-control-sm" value="${escapeHtml(item.comentario || '')}" placeholder="Comentario interno..." onchange="actualizarArrepentimientoField('${item.id}', 'comentario', this.value)">
+        </td>
+        <td class="col-canal">
+          <select class="form-select form-select-sm" onchange="actualizarArrepentimientoField('${item.id}', 'canal', this.value)">
+            <option value="">-</option>
+            ${opcionesCanal.map(canal => `<option value="${escapeHtml(canal.value)}" ${canalActual === canal.value ? 'selected' : ''}>${escapeHtml(canal.label)}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <select class="form-select form-select-sm" onchange="actualizarArrepentimientoField('${item.id}', 'template_id', this.value)">
+            ${opcionesPlantillasEmail(item.template_id)}
+          </select>
         </td>
         <td>
           <select class="form-select form-select-sm" onchange="cambiarEstadoArrepentimiento('${item.id}', this.value)">
@@ -477,6 +571,57 @@ function renderizarArrepentimientos() {
 
 function filtrarArrepentimientos() {
   renderizarArrepentimientos();
+}
+
+function seleccionarTodosArrepentimientos(checked) {
+  document.querySelectorAll('.chk-arrepentimiento').forEach(input => {
+    input.checked = checked;
+  });
+}
+
+function obtenerArrepentimientosSeleccionados() {
+  return Array.from(document.querySelectorAll('.chk-arrepentimiento:checked')).map(input => input.value);
+}
+
+async function aplicarCambiosMasivosArrepentimientos() {
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canWrite === 'function' && !canWrite()) return mostrarNotificacion('No tenés permisos para modificar registros.', 'danger');
+
+  const ids = obtenerArrepentimientosSeleccionados();
+  const estado = document.getElementById('bulkEstadoArrepentimiento')?.value || '';
+  const canal = document.getElementById('bulkCanalArrepentimiento')?.value || '';
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos una fila.', 'warning');
+  if (!estado && !canal) return mostrarNotificacion('Elegí un estado o canal para aplicar.', 'warning');
+
+  const cambios = {};
+  if (estado) cambios.estado = estado;
+  if (canal) cambios.canal = canal;
+  const { error } = await supabaseClient.from('arrepentimientos').update(cambios).in('id', ids);
+  if (error) return mostrarNotificacion('No se pudieron aplicar los cambios: ' + error.message, 'danger');
+
+  listaArrepentimientos.forEach(item => {
+    if (ids.includes(String(item.id))) Object.assign(item, cambios);
+  });
+  document.getElementById('bulkEstadoArrepentimiento').value = '';
+  document.getElementById('bulkCanalArrepentimiento').value = '';
+  renderizarArrepentimientos();
+  mostrarNotificacion(`Se actualizaron ${ids.length} registros.`, 'success');
+}
+
+async function eliminarArrepentimientosSeleccionados() {
+  if (typeof requireAuth === 'function' && !(await requireAuth())) return;
+  if (typeof canDelete === 'function' && !canDelete()) return mostrarNotificacion('No tenés permisos para eliminar registros.', 'danger');
+
+  const ids = obtenerArrepentimientosSeleccionados();
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos una fila.', 'warning');
+  if (!confirm(`¿Eliminar las ${ids.length} solicitudes seleccionadas?`)) return;
+
+  const { error } = await supabaseClient.from('arrepentimientos').delete().in('id', ids);
+  if (error) return mostrarNotificacion('No se pudieron eliminar los registros: ' + error.message, 'danger');
+
+  listaArrepentimientos = listaArrepentimientos.filter(item => !ids.includes(String(item.id)));
+  renderizarArrepentimientos();
+  mostrarNotificacion(`Se eliminaron ${ids.length} registros.`, 'success');
 }
 
 // IMPORTACIÓN CON NOTIFICACIÓN Y CONFIRMACIÓN INTEGRADAS
@@ -514,7 +659,8 @@ async function importarArrepentimientosCSV(event) {
       const tel = getVal(['Teléfono', 'Telefono', 'Tel']);
       const email = getVal(['Email', 'Mail']);
       const motivo1 = getVal(['Motivo 1', 'Motivo']);
-      const motivoDetalle = getVal(['Otros', 'Motivo 2']);
+      const otroVal = getVal(['Otro', 'Otro motivo', 'Otros', 'Motivo 2']);
+      const canalVal = getVal(['Canal', 'Channel']);
       const comentarioVal = getVal(['Comentarios', 'Comentario']);
 
       registrosNuevos.push({
@@ -526,8 +672,10 @@ async function importarArrepentimientosCSV(event) {
         pedido_id: pedidoVal,
         numero_pedido: pedidoVal,
         pedido: pedidoVal,
-        motivo: [motivo1, motivoDetalle].filter(Boolean).join(' - ') || 'Arrepentimiento de compra',
+        motivo: motivo1 || 'Arrepentimiento de compra',
+        otro: otroVal || '',
         comentario: comentarioVal || '',
+        canal: canalVal || '',
         estado: 'Enviado a Caja'
       });
     }
@@ -639,7 +787,7 @@ function exportarArrepentimientosCSV() {
 }
 
 function generarDescargaCSVArrepentimiento(datos, nombreArchivo) {
-  const headers = ['Cliente', 'DNI', 'Telefono', 'Email', 'Pedido', 'Motivo', 'Comentario Interno', 'Estado Pedido', 'Emails Destino', 'Estado Cliente', 'Fecha Envío'];
+  const headers = ['Cliente', 'DNI', 'Telefono', 'Email', 'Pedido', 'Motivo', 'Otro', 'Comentario Interno', 'Canal', 'Estado Pedido', 'Emails Destino', 'Estado Cliente', 'Fecha Envío'];
   const csvRows = [
     headers.join(';'),
     ...datos.map(item => [
@@ -649,7 +797,9 @@ function generarDescargaCSVArrepentimiento(datos, nombreArchivo) {
       csvEscape(item.cliente_email || item.cliente_mail || ''),
       csvEscape(item.pedido_id || item.numero_pedido || item.pedido || ''),
       csvEscape(item.motivo || ''),
+      csvEscape(item.otro || ''),
       csvEscape(item.comentario || ''),
+      csvEscape(item.canal || ''),
       csvEscape(item.estado || ''),
       csvEscape(item.emails_destino || ''),
       csvEscape(item.estado_cliente || 'Pendiente'),
@@ -683,9 +833,11 @@ async function enviarMailArrepentimiento(id) {
 
   try {
     const pId = item.pedido_id || item.numero_pedido || item.pedido || 'S/N';
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    const templateId = item.template_id || EMAILJS_TEMPLATE_ID;
+    const template = plantillasEmailData.find(value => String(value.id) === String(templateId));
+    await emailjs.send(EMAILJS_SERVICE_ID, templateId, {
       email_destino: destino.trim(),
-      asunto: `Gestión de Solicitud de Arrepentimiento - Orden ${pId}`,
+      asunto: template?.nombre || `Gestión de Solicitud de Arrepentimiento - Orden ${pId}`,
       mensaje: `Hola ${item.cliente_nombre || ''},\n\nTu solicitud de arrepentimiento para el pedido ${pId} fue gestionada.\nEstado: ${item.estado || '-'}\nComentarios: ${item.comentario || '-'}`
     });
 

@@ -199,6 +199,269 @@ h6, .h6 { font-size: 0.8rem !important; }
   display: block;
 }
 
+/* Jerarquia visual de la vista de arrepentimientos */
+.arrepentimiento-view {
+  --view-border: #dbe3ec;
+  --view-muted: #64748b;
+  --view-surface: #ffffff;
+  --view-soft: #f4f7fa;
+}
+
+.arrepentimiento-header {
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--view-border);
+}
+
+.arrepentimiento-header h2 {
+  color: #172b4d;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.arrepentimiento-header h2 i {
+  color: var(--color-cda-principal);
+  margin-right: 0.35rem;
+}
+
+.view-kicker,
+.filter-heading,
+.bulk-label {
+  color: var(--view-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.view-subtitle {
+  color: var(--view-muted);
+  font-size: 0.82rem;
+}
+
+.view-actions .btn {
+  white-space: nowrap;
+}
+
+.filter-panel,
+.bulk-actions-bar {
+  background: var(--view-surface);
+  border: 1px solid var(--view-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.filter-panel {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.filter-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+
+.filter-heading i {
+  color: var(--color-cda-principal);
+  font-size: 0.85rem;
+}
+
+.bulk-actions-bar {
+  background: var(--view-soft);
+  border-color: #e4eaf1;
+  min-height: 48px;
+}
+
+.bulk-selection {
+  padding-right: 0.25rem;
+}
+
+.bulk-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--view-border);
+}
+
+.bulk-action-control {
+  width: 190px;
+}
+
+.bulk-delete-action {
+  color: #a33a3a;
+  text-decoration: none;
+}
+
+.bulk-delete-action:hover,
+.bulk-delete-action:focus {
+  color: #7f1d1d;
+  background: #fbecec;
+}
+
+.arrepentimiento-view .card.p-3:has(#tablaArrepentimientos) {
+  padding: 0.5rem !important;
+  border: 1px solid var(--view-border);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+#tablaArrepentimientos thead th {
+  color: #41546d;
+  background: #f4f7fa;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+#tablaArrepentimientos tbody tr:hover {
+  background-color: #f8fbfd;
+}
+
+#tablaArrepentimientos .form-control,
+#tablaArrepentimientos .form-select {
+  border-color: #d7e0ea;
+  background-color: #fff;
+}
+
+#tablaArrepentimientos .form-control:focus,
+#tablaArrepentimientos .form-select:focus,
+.filter-panel .form-control:focus,
+.filter-panel .form-select:focus {
+  border-color: #7da6c7;
+  box-shadow: 0 0 0 0.15rem rgba(0, 76, 143, 0.12);
+}
+
+/* Lenguaje visual compartido por las vistas operativas */
+.view-page-header {
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid #dbe3ec;
+}
+
+.view-page-header h2 {
+  color: #172b4d;
+  font-weight: 650;
+}
+
+.view-page-header h2 i {
+  color: var(--color-cda-principal) !important;
+}
+
+.view-page-header p {
+  color: #64748b !important;
+  font-size: 0.82rem;
+}
+
+.pedidos-view .card.p-3,
+.clientes-view .card.p-3,
+.admin-view .card.p-3 {
+  border: 1px solid #dbe3ec;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.pedidos-view .card.mb-4,
+.clientes-view .card.mb-4 {
+  background: #fff;
+  padding: 0.75rem !important;
+}
+
+.pedidos-view .table thead th,
+.clientes-view .table thead th,
+.admin-view .table thead th {
+  color: #41546d;
+  background: #f4f7fa;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.pedidos-view .table tbody tr:hover,
+.clientes-view .table tbody tr:hover,
+.admin-view .table tbody tr:hover {
+  background: #f8fbfd;
+}
+
+.pedidos-view .form-control:focus,
+.pedidos-view .form-select:focus,
+.clientes-view .form-control:focus,
+.clientes-view .form-select:focus,
+.admin-view .form-control:focus,
+.admin-view .form-select:focus {
+  border-color: #7da6c7;
+  box-shadow: 0 0 0 0.15rem rgba(0, 76, 143, 0.12);
+}
+
+.tracking-panel {
+  border: 1px solid #dbe3ec;
+  border-left: 3px solid var(--color-cda-principal);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.tracking-panel h6 {
+  color: #172b4d !important;
+  font-weight: 700;
+}
+
+.tracking-panel .input-group {
+  max-width: 680px;
+}
+
+.admin-view .card.bg-secondary {
+  background: #fff !important;
+  border: 1px solid #dbe3ec !important;
+  border-left-width: 3px !important;
+  color: #64748b !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.admin-view .card.bg-secondary small {
+  color: #64748b !important;
+}
+
+.admin-view .card.bg-secondary h3 {
+  color: #172b4d !important;
+}
+
+.admin-view .nav-pills {
+  gap: 0.35rem;
+  border-bottom: 1px solid #dbe3ec;
+  padding-bottom: 0.4rem;
+}
+
+.admin-view .nav-pills .nav-link {
+  color: #52657b;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.admin-view .nav-pills .nav-link.active,
+.admin-view .nav-pills .nav-link:hover {
+  color: #174f7c;
+  background: #eaf2f8;
+}
+
+.admin-view .tab-pane > .card {
+  box-shadow: none;
+}
+
+.admin-view .tab-pane > .card > .d-flex {
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.admin-view .tab-pane > .card > .d-flex > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-view .bulk-action-control {
+  width: 160px;
+}
+
 /* Optimización para Tablas */
 .table {
   font-size: 0.8125rem; /* 13px para datos de tabla */
@@ -219,7 +482,9 @@ h6, .h6 { font-size: 0.8rem !important; }
 }
 
 #tablaArrepentimientos th.col-motivo,
-#tablaArrepentimientos td.col-motivo {
+#tablaArrepentimientos td.col-motivo,
+#tablaArrepentimientos th.col-otro,
+#tablaArrepentimientos td.col-otro {
   width: 180px;
   min-width: 180px;
   max-width: 180px;
@@ -227,11 +492,20 @@ h6, .h6 { font-size: 0.8rem !important; }
   overflow-wrap: anywhere;
 }
 
+#tablaArrepentimientos th.col-canal,
+#tablaArrepentimientos td.col-canal {
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+}
+
 .table-responsive {
   border-radius: 0.375rem;
   border: 1px solid #e2e8f0;
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -259,7 +533,7 @@ h6, .h6 { font-size: 0.8rem !important; }
 
 /* Scrollbar y altura optimizada para tablas extensas */
 .table-scroll-container {
-  max-height: 60vh;
+  max-height: 600px;
   overflow-x: auto;
   overflow-y: auto;
   border: 1px solid #e2e8f0;
@@ -375,6 +649,59 @@ h6, .h6 { font-size: 0.8rem !important; }
     font-size: 0.8125rem;
   }
 
+  .arrepentimiento-header {
+    align-items: stretch !important;
+  }
+
+  .view-page-header {
+    align-items: stretch !important;
+  }
+
+  .view-page-header > div:last-child {
+    width: 100%;
+  }
+
+  .view-page-header > div:last-child .btn,
+  .view-page-header > .btn {
+    flex: 1 1 auto;
+  }
+
+  .view-actions {
+    width: 100%;
+  }
+
+  .view-actions .btn,
+  .view-actions label {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .bulk-actions-bar {
+    align-items: stretch !important;
+  }
+
+  .bulk-divider {
+    display: none;
+  }
+
+  .bulk-action-control {
+    flex: 1 1 180px;
+    width: auto;
+  }
+
+  .bulk-actions-bar > .btn {
+    flex: 1 1 150px;
+  }
+
+  .admin-view .tab-pane > .card > .d-flex > div {
+    width: 100%;
+  }
+
+  .admin-view .tab-pane > .card > .d-flex > div .btn,
+  .admin-view .tab-pane > .card > .d-flex > div .bulk-action-control {
+    flex: 1 1 auto;
+  }
+
   .table th,
   .table td {
     padding: 0.35rem 0.45rem;
@@ -388,4 +715,10 @@ h6, .h6 { font-size: 0.8rem !important; }
   .card h3 {
     font-size: 1.3rem;
   }
+}
+
+.table-responsive > table,
+.table-scroll-container > table {
+  width: max-content;
+  min-width: 100%;
 }

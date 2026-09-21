@@ -84,7 +84,7 @@ function renderTablaEnvios() {
   tbody.innerHTML = '';
 
   if (clientesData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">Sin clientes registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">Sin clientes registrados.</td></tr>';
     return;
   }
 
@@ -95,6 +95,14 @@ function renderTablaEnvios() {
     if (c.estado === 'error') badgeClass = 'badge-error';
 
     const tr = document.createElement('tr');
+
+    const selectionCell = document.createElement('td');
+    const selection = document.createElement('input');
+    selection.type = 'checkbox';
+    selection.className = 'cliente-checkbox';
+    selection.value = c.id;
+    selectionCell.appendChild(selection);
+    tr.appendChild(selectionCell);
 
     const nombreCell = document.createElement('td');
     const nombreStrong = document.createElement('strong');
@@ -244,7 +252,7 @@ async function enviarMail(clienteId) {
 
   try {
     const params = { email_destino: emailDestino, asunto: asuntoFinal, mensaje: cuerpoFinal };
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+    await emailjs.send(EMAILJS_SERVICE_ID, template.id, params);
     await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
     
     alert(`📧 Mail enviado con éxito a ${emailDestino}`);
@@ -332,6 +340,45 @@ function toggleSelectAll(masterId, className) {
   document.querySelectorAll('.' + className).forEach(chk => chk.checked = master.checked);
 }
 
+function configuracionSeleccionAdmin(tipo) {
+  const configuraciones = {
+    promos: { selector: '.chk-promo', tabla: 'admin_promos', campo: 'estado', control: 'bulkEstadoPromos', cargar: cargarPromosWeb },
+    bancarias: { selector: '.chk-bancaria', tabla: 'admin_promos_bancarias', campo: 'estado_vigencia', control: 'bulkEstadoBancarias', cargar: cargarPromosBancarias },
+    novedades: { selector: '.chk-novedad', tabla: 'admin_novedades', campo: 'activa', control: 'bulkEstadoNovedades', cargar: cargarNovedadesOperativas }
+  };
+  return configuraciones[tipo];
+}
+
+async function actualizarSeleccionAdmin(tipo) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canWrite()) return;
+
+  const configuracion = configuracionSeleccionAdmin(tipo);
+  const ids = Array.from(document.querySelectorAll(`${configuracion.selector}:checked`)).map(input => input.value);
+  const valor = document.getElementById(configuracion.control)?.value || '';
+  if (!ids.length) return alert('Seleccioná al menos un registro.');
+  if (!valor) return alert('Elegí un estado para aplicar.');
+
+  const { error } = await supabaseClient.from(configuracion.tabla).update({ [configuracion.campo]: valor }).in('id', ids);
+  if (error) return alert('No se pudieron aplicar los cambios: ' + error.message);
+  document.getElementById(configuracion.control).value = '';
+  await configuracion.cargar();
+}
+
+async function eliminarSeleccionAdmin(tipo) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const configuracion = configuracionSeleccionAdmin(tipo);
+  const ids = Array.from(document.querySelectorAll(`${configuracion.selector}:checked`)).map(input => input.value);
+  if (!ids.length) return alert('Seleccioná al menos un registro.');
+  if (!confirm(`¿Eliminar los ${ids.length} registros seleccionados?`)) return;
+
+  const { error } = await supabaseClient.from(configuracion.tabla).delete().in('id', ids);
+  if (error) return alert('No se pudieron eliminar los registros: ' + error.message);
+  await configuracion.cargar();
+}
+
 // RENDER DE TABLAS CON CHECKBOXES
 async function cargarPromosWeb() {
   const { data: promos } = await supabaseClient.from('admin_promos').select('*').order('created_at', { ascending: false });
@@ -415,7 +462,7 @@ async function cargarUsuariosRoles() {
 
   const { data: perfiles, error } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false });
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">No se pudieron cargar los permisos: ${escapeHtml(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">No se pudieron cargar los permisos: ${escapeHtml(error.message)}</td></tr>`;
     console.error(error);
     return;
   }
@@ -423,13 +470,14 @@ async function cargarUsuariosRoles() {
   tbody.innerHTML = '';
 
   if (!perfiles || perfiles.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3">Sin usuarios registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3">Sin usuarios registrados.</td></tr>';
     return;
   }
 
   perfiles.forEach(usuario => {
     const row = document.createElement('tr');
     row.innerHTML = `
+      <td><input type="checkbox" class="usuario-checkbox" value="${usuario.id}"></td>
       <td><strong>${usuario.id ? usuario.id.slice(0, 8) : '-'}</strong></td>
       <td>${escapeHtml(usuario.email || '-')}</td>
       <td>${usuario.role || 'viewer'}</td>
@@ -452,6 +500,28 @@ async function cargarUsuariosRoles() {
   });
 
   toggleAdminOnlySections();
+}
+
+function seleccionarTodosUsuarios(checked) {
+  document.querySelectorAll('.usuario-checkbox').forEach(input => {
+    input.checked = checked;
+  });
+}
+
+async function actualizarRolesSeleccionados() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const ids = Array.from(document.querySelectorAll('.usuario-checkbox:checked')).map(input => input.value);
+  const rol = document.getElementById('bulkRolUsuarios')?.value || '';
+  if (!ids.length) return alert('Seleccioná al menos un usuario.');
+  if (!rol) return alert('Elegí un rol para aplicar.');
+  if (!confirm(`¿Asignar el rol ${rol} a ${ids.length} usuario(s)?`)) return;
+
+  const { error } = await supabaseClient.from('profiles').update({ role: rol }).in('id', ids);
+  if (error) return alert('No se pudieron actualizar los roles: ' + error.message);
+  document.getElementById('bulkRolUsuarios').value = '';
+  await cargarUsuariosRoles();
 }
 
 async function guardarPermisoUsuario(userId) {
@@ -570,4 +640,46 @@ async function enviarMailsSeleccionados(tipo) {
   } catch (err) {
     alert("❌ Error al enviar mail: " + JSON.stringify(err));
   }
+}
+
+function seleccionarTodosClientes(checked) {
+  document.querySelectorAll('.cliente-checkbox').forEach(input => {
+    input.checked = checked;
+  });
+  const headerCheckbox = document.getElementById('chkTodosClientesTabla');
+  const toolbarCheckbox = document.getElementById('chkTodosClientes');
+  if (headerCheckbox) headerCheckbox.checked = checked;
+  if (toolbarCheckbox) toolbarCheckbox.checked = checked;
+}
+
+async function aplicarCambiosMasivosClientes() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canWrite()) return;
+
+  const ids = Array.from(document.querySelectorAll('.cliente-checkbox:checked')).map(input => input.value);
+  const estado = document.getElementById('bulkEstadoCliente')?.value || '';
+  if (!ids.length) return alert('Seleccioná al menos un cliente.');
+  if (!estado) return alert('Elegí un estado para aplicar.');
+
+  const { error } = await supabaseClient.from('clientes').update({ estado }).in('id', ids);
+  if (error) return alert('No se pudieron aplicar los cambios: ' + error.message);
+  clientesData.forEach(cliente => {
+    if (ids.includes(String(cliente.id))) cliente.estado = estado;
+  });
+  document.getElementById('bulkEstadoCliente').value = '';
+  renderTablaEnvios();
+}
+
+async function eliminarClientesSeleccionados() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const ids = Array.from(document.querySelectorAll('.cliente-checkbox:checked')).map(input => input.value);
+  if (!ids.length) return alert('Seleccioná al menos un cliente.');
+  if (!confirm(`¿Eliminar los ${ids.length} clientes seleccionados?`)) return;
+
+  const { error } = await supabaseClient.from('clientes').delete().in('id', ids);
+  if (error) return alert('No se pudieron eliminar los clientes: ' + error.message);
+  clientesData = clientesData.filter(cliente => !ids.includes(String(cliente.id)));
+  renderTablaEnvios();
 }

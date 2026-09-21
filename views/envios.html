@@ -1,4 +1,5 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
+<section class="clientes-view">
+<div class="view-page-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3">
   <h2><i class="bi bi-box-seam text-primary"></i> Gestión de Clientes y Pedidos</h2>
   <div>
     <button class="btn btn-outline-secondary me-2 btn-sm" onclick="cargarDatosEnvios()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
@@ -11,17 +12,37 @@
   <input type="text" id="searchInput" class="form-control" placeholder="Buscar..." onkeyup="filtrarTabla()">
 </div>
 
+<div class="bulk-actions-bar d-flex flex-wrap align-items-center gap-2 mb-3" id="accionesMasivasClientes">
+  <div class="bulk-selection d-flex align-items-center gap-2">
+    <input type="checkbox" class="form-check-input" id="chkTodosClientes" onchange="seleccionarTodosClientes(this.checked)" title="Seleccionar todas las filas">
+    <label class="small mb-0" for="chkTodosClientes">Seleccionar todo</label>
+  </div>
+  <span class="bulk-divider"></span>
+  <span class="bulk-label">Con selección:</span>
+  <select class="form-select form-select-sm bulk-action-control" id="bulkEstadoCliente">
+    <option value="">Cambiar estado...</option>
+    <option value="sin aviso">Sin aviso</option>
+    <option value="en proceso">En proceso</option>
+    <option value="enviado">Enviado</option>
+    <option value="error">Error</option>
+  </select>
+  <button class="btn btn-primary btn-sm" type="button" onclick="aplicarCambiosMasivosClientes()" data-role-action="write"><i class="bi bi-check2"></i> Aplicar cambios</button>
+  <button class="btn btn-link btn-sm bulk-delete-action" type="button" onclick="eliminarClientesSeleccionados()" data-role-action="delete"><i class="bi bi-trash3"></i> Eliminar</button>
+</div>
+
+
 <div class="card p-3">
   <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead class="table-light">
         <tr>
-          <th>Nombre</th><th>Pedido</th><th>Mail</th><th width="240">Plantilla</th><th>Enviar</th><th>Estado</th><th>Fecha y hora de envío</th><th class="text-center">Acciones</th>
+          <th><input type="checkbox" id="chkTodosClientesTabla" onchange="seleccionarTodosClientes(this.checked)"></th><th>Nombre</th><th>Pedido</th><th>Mail</th><th width="240">Plantilla</th><th>Enviar</th><th>Estado</th><th>Fecha y hora de envío</th><th class="text-center">Acciones</th>
         </tr>
       </thead>
       <tbody id="tableBody">
-        <tr><td colspan="8" class="text-center py-4">Cargando datos...</td></tr>
+        <tr><td colspan="9" class="text-center py-4">Cargando datos...</td></tr>
       </tbody>
     </table>
   </div>
 </div>
+</section>

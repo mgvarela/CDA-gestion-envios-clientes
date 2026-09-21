@@ -1,4 +1,5 @@
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+<section class="admin-view">
+<div class="view-page-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3">
   <h2><i class="bi bi-speedometer2 text-primary"></i> Dashboard de Promociones & Operaciones</h2>
   <button class="btn btn-outline-secondary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
 </div>
@@ -56,8 +57,11 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Listado de Promociones</h5>
         <div>
-          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('promos')" data-role-action="write" id="btnEnviarPromos"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromo" data-role-action="write" id="btnNuevaPromo"><i class="bi bi-plus-lg"></i> Nueva Promo</button>
+          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('promos')" data-role-action="write" id="btnEnviarPromos"><i class="bi bi-envelope-at"></i> Enviar</button>
+          <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromo" data-role-action="write" id="btnNuevaPromo"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <select class="form-select form-select-sm d-inline-block bulk-action-control" id="bulkEstadoPromos" aria-label="Estado de promociones"><option value="">Cambiar estado...</option><option value="Activa">Activa</option><option value="Inactiva">Inactiva</option></select>
+          <button class="btn btn-primary btn-sm" onclick="actualizarSeleccionAdmin('promos')" data-role-action="write"><i class="bi bi-check2"></i> Aplicar</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="eliminarSeleccionAdmin('promos')" data-role-action="delete"><i class="bi bi-trash"></i></button>
         </div>
       </div>
       <div class="table-responsive">
@@ -80,8 +84,11 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Listado de Convenios Bancarios</h5>
         <div>
-          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('bancarias')" data-role-action="write" id="btnEnviarBancarias"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromoBancaria" data-role-action="write" id="btnNuevaPromoBancaria"><i class="bi bi-plus-lg"></i> Nueva Promo Bancaria</button>
+          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('bancarias')" data-role-action="write" id="btnEnviarBancarias"><i class="bi bi-envelope-at"></i> Enviar</button>
+          <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromoBancaria" data-role-action="write" id="btnNuevaPromoBancaria"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <select class="form-select form-select-sm d-inline-block bulk-action-control" id="bulkEstadoBancarias" aria-label="Estado de promociones bancarias"><option value="">Cambiar estado...</option><option value="ACTIVA">Activa</option><option value="INACTIVA">Inactiva</option></select>
+          <button class="btn btn-primary btn-sm" onclick="actualizarSeleccionAdmin('bancarias')" data-role-action="write"><i class="bi bi-check2"></i> Aplicar</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="eliminarSeleccionAdmin('bancarias')" data-role-action="delete"><i class="bi bi-trash"></i></button>
         </div>
       </div>
       <div class="table-responsive">
@@ -104,8 +111,11 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Novedades y Medios de Pago</h5>
         <div>
-          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('novedades')" data-role-action="write" id="btnEnviarNovedades"><i class="bi bi-envelope-at"></i> Enviar Notificación</button>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaNovedad" data-role-action="write" id="btnNuevaNovedad"><i class="bi bi-plus-lg"></i> Nueva Novedad</button>
+          <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('novedades')" data-role-action="write" id="btnEnviarNovedades"><i class="bi bi-envelope-at"></i> Enviar</button>
+          <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaNovedad" data-role-action="write" id="btnNuevaNovedad"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <select class="form-select form-select-sm d-inline-block bulk-action-control" id="bulkEstadoNovedades" aria-label="Estado de novedades"><option value="">Cambiar estado...</option><option value="Si">Activa</option><option value="No">Inactiva</option></select>
+          <button class="btn btn-primary btn-sm" onclick="actualizarSeleccionAdmin('novedades')" data-role-action="write"><i class="bi bi-check2"></i> Aplicar</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="eliminarSeleccionAdmin('novedades')" data-role-action="delete"><i class="bi bi-trash"></i></button>
         </div>
       </div>
       <div class="table-responsive">
@@ -127,12 +137,17 @@
     <div class="card p-3">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">Permisos de Usuarios</h5>
-        <button class="btn btn-outline-primary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+        <div class="d-flex flex-wrap gap-2">
+          <select class="form-select form-select-sm bulk-action-control" id="bulkRolUsuarios" aria-label="Rol masivo"><option value="">Cambiar rol...</option><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option></select>
+          <button class="btn btn-primary btn-sm" onclick="actualizarRolesSeleccionados()" data-role-action="write"><i class="bi bi-check2"></i> Aplicar rol</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="cargarDatosAdmin()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle">
           <thead class="table-light">
             <tr>
+              <th><input type="checkbox" id="chkTodosUsuarios" onchange="seleccionarTodosUsuarios(this.checked)"></th>
               <th>ID de Usuario</th>
               <th>Email</th>
               <th>Rol Actual</th>
@@ -140,9 +155,10 @@
               <th class="text-end">Acción</th>
             </tr>
           </thead>
-          <tbody id="tblUsuariosPermisos"><tr><td colspan="5" class="text-center py-3">Cargando...</td></tr></tbody>
+          <tbody id="tblUsuariosPermisos"><tr><td colspan="6" class="text-center py-3">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
   </div>
 </div>
+</section>

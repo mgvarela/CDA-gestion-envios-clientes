@@ -62,6 +62,7 @@ create table if not exists public.pedidos_mercaderia (
   emails_destino text,
   desde_hasta text,
   tipo_plantilla text default 'pedido_mercaderia',
+  template_id text,
   estado text not null default 'pendiente',
   fecha_envio timestamptz,
   created_at timestamptz not null default now()
@@ -79,7 +80,10 @@ create table if not exists public.arrepentimientos (
   pedido_id text,
   numero_pedido text,
   pedido text,
+  canal text,
   motivo text,
+  otro text,
+  template_id text,
   comentario text,
   estado text not null default 'pendiente',
   fecha_envio timestamptz,
@@ -101,6 +105,9 @@ alter table public.arrepentimientos add column if not exists cliente_mail text;
 alter table public.arrepentimientos add column if not exists pedido_id text;
 alter table public.arrepentimientos add column if not exists numero_pedido text;
 alter table public.arrepentimientos add column if not exists pedido text;
+alter table public.arrepentimientos add column if not exists canal text;
+alter table public.arrepentimientos add column if not exists otro text;
+alter table public.arrepentimientos add column if not exists template_id text;
 alter table public.arrepentimientos add column if not exists comentario text;
 alter table public.arrepentimientos add column if not exists fecha_envio timestamptz;
 alter table public.arrepentimientos add column if not exists created_at timestamptz default now();
@@ -108,7 +115,15 @@ alter table public.arrepentimientos add column if not exists created_at timestam
 alter table public.pedidos_mercaderia add column if not exists emails_destino text;
 alter table public.pedidos_mercaderia add column if not exists desde_hasta text;
 alter table public.pedidos_mercaderia add column if not exists tipo_plantilla text default 'pedido_mercaderia';
+alter table public.pedidos_mercaderia add column if not exists template_id text;
 alter table public.pedidos_mercaderia add column if not exists fecha_envio timestamptz;
+
+create table if not exists public.templates (
+  id text primary key,
+  nombre text not null,
+  cuerpo text not null,
+  created_at timestamptz default now()
+);
 
 -- La funcion evita consultar profiles desde una policy de profiles y caer en recursion.
 create or replace function public.current_user_role()
@@ -320,7 +335,10 @@ create table if not exists public.arrepentimientos (
   pedido_id text,
   numero_pedido text,
   pedido text,
+  canal text,
   motivo text,
+  otro text,
+  template_id text,
   comentario text,
   estado text not null default 'Enviado a Caja',
   estado_cliente text default 'Pendiente',
@@ -334,6 +352,9 @@ create table if not exists public.arrepentimientos (
 alter table public.arrepentimientos add column if not exists estado_cliente text default 'Pendiente';
 alter table public.arrepentimientos add column if not exists emails_destino text;
 alter table public.arrepentimientos add column if not exists check_envio boolean default false;
+alter table public.arrepentimientos add column if not exists canal text;
+alter table public.arrepentimientos add column if not exists otro text;
+alter table public.arrepentimientos add column if not exists template_id text;
 alter table public.arrepentimientos add column if not exists comentario text;
 
 -- 2. Tabla de Logs de Errores
