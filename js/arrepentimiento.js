@@ -934,44 +934,9 @@ async function enviarMailArrepentimiento(id, mostrarResultado = true, modo = 'ma
 }
 
 async function registrarErrorArrepentimiento(mensaje, referencia) {
-  try {
-    const session = (await supabaseClient.auth.getSession()).data.session;
-    await supabaseClient.from('arrepentimientos_logs').insert([{
-      mensaje_error: mensaje,
-      referencia_fila: referencia,
-      usuario_email: session?.user?.email || 'sistema'
-    }]);
-  } catch (e) {
-    console.error('Error guardando log de error:', e);
+  if (typeof registrarLogApp === 'function') {
+    await registrarLogApp('Arrepentimientos', 'Error', referencia, mensaje);
   }
-}
-
-async function abrirLogsArrepentimiento() {
-  if (currentUserRole !== 'admin') return mostrarNotificacion('Acceso exclusivo para administradores.', 'warning');
-
-  const tbody = document.getElementById('tblLogsArrepentimientoBody');
-  if (!tbody) return;
-
-  tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando logs...</td></tr>';
-
-  const modalEl = document.getElementById('modalLogsArrepentimiento');
-  if (modalEl) new bootstrap.Modal(modalEl).show();
-
-  const { data, error } = await supabaseClient.from('arrepentimientos_logs').select('*').order('created_at', { ascending: false }).limit(50);
-
-  if (error) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error: ${escapeHtml(error.message)}</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = (data || []).map(log => `
-    <tr>
-      <td>${new Date(log.created_at || log.fecha).toLocaleString('es-AR')}</td>
-      <td class="text-danger fw-bold">${escapeHtml(log.mensaje_error)}</td>
-      <td><code>${escapeHtml(log.referencia_fila || '-')}</code></td>
-      <td>${escapeHtml(log.usuario_email || '-')}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="4" class="text-center py-3">Sin errores registrados.</td></tr>';
 }
 
 // ==========================================

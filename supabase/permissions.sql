@@ -273,12 +273,109 @@ on public.profiles for delete to authenticated
 using (false);
 
 -- Agrega created_at a las tablas del dashboard si ya existen sin esa columna.
+create table if not exists public.admin_promos (
+  id uuid primary key default gen_random_uuid(),
+  codigo text unique,
+  promo text not null,
+  inicio timestamptz,
+  fin timestamptz,
+  landing text,
+  observaciones text,
+  canal text default 'web',
+  estado text default 'Activa',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_promos_bancarias (
+  id uuid primary key default gen_random_uuid(),
+  codigo text unique,
+  banco text not null,
+  descuento text,
+  cuotas text,
+  vigencia_inicio date,
+  vigencia_fin date,
+  alcance text default 'web',
+  activa boolean default true,
+  estado_vigencia text default 'ACTIVA',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_novedades (
+  id uuid primary key default gen_random_uuid(),
+  codigo text unique,
+  categoria text not null,
+  descripcion text not null,
+  activa text default 'Si',
+  created_at timestamptz not null default now()
+);
+
 alter table if exists public.admin_promos
   add column if not exists created_at timestamptz not null default now();
+alter table if exists public.admin_promos
+  add column if not exists promo text;
+alter table if exists public.admin_promos
+  add column if not exists codigo text;
+alter table if exists public.admin_promos
+  add column if not exists inicio timestamptz;
+alter table if exists public.admin_promos
+  add column if not exists fin timestamptz;
+alter table if exists public.admin_promos
+  add column if not exists landing text;
+alter table if exists public.admin_promos
+  add column if not exists observaciones text;
+alter table if exists public.admin_promos
+  add column if not exists canal text default 'web';
+alter table if exists public.admin_promos
+  add column if not exists estado text default 'Activa';
 alter table if exists public.admin_promos_bancarias
   add column if not exists created_at timestamptz not null default now();
+alter table if exists public.admin_promos_bancarias
+  add column if not exists banco text;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists codigo text;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists descuento text;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists cuotas text;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists vigencia_inicio date;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists vigencia_fin date;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists alcance text default 'web';
+alter table if exists public.admin_promos_bancarias
+  add column if not exists activa boolean default true;
+alter table if exists public.admin_promos_bancarias
+  add column if not exists estado_vigencia text default 'ACTIVA';
+alter table if exists public.admin_promos_bancarias
+  alter column activa drop default;
+alter table if exists public.admin_promos_bancarias
+  alter column activa type boolean using case
+    when lower(coalesce(activa::text, '')) in ('si', 'sí', 'true', '1', 't') then true
+    else false
+  end;
+alter table if exists public.admin_promos_bancarias
+  alter column activa set default true;
 alter table if exists public.admin_novedades
   add column if not exists created_at timestamptz not null default now();
+alter table if exists public.admin_novedades
+  add column if not exists categoria text;
+alter table if exists public.admin_novedades
+  add column if not exists codigo text;
+alter table if exists public.admin_novedades
+  add column if not exists descripcion text;
+alter table if exists public.admin_novedades
+  add column if not exists activa text default 'Si';
+
+create unique index if not exists admin_promos_codigo_unique
+  on public.admin_promos (codigo)
+  where codigo is not null;
+create unique index if not exists admin_promos_bancarias_codigo_unique
+  on public.admin_promos_bancarias (codigo)
+  where codigo is not null;
+create unique index if not exists admin_novedades_codigo_unique
+  on public.admin_novedades (codigo)
+  where codigo is not null;
 alter table public.clientes
   add column if not exists fecha_envio timestamptz;
 
@@ -577,5 +674,131 @@ insert into public.configuraciones_sistema (clave, valor, descripcion, es_secret
   ('EMAIL_ADMIN_GRUPO', 'info---ecommerce@googlegroups.com', 'Email grupal para alertas de cambios operativos y promociones', false),
   ('GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbyOHK_tiJJgVY9HffudGWQuyfCIIld70VpFg7d4EonvYe2dbOm30p8CAqm9rczkQv9R/exec', 'Webhook URL de Google Apps Script para archivado de arrepentimientos', true)
 on conflict (clave) do nothing;
+
+notify pgrst, 'reload schema';
+
+-- Registro global de actividad y auditoría de cambios operativos.
+create table if not exists public.app_logs (
+  id uuid primary key default gen_random_uuid(),
+  modulo text not null,
+  accion text not null,
+  referencia text,
+  detalle text,
+  usuario_id uuid,
+  usuario_email text,
+  origen_id uuid unique,
+  created_at timestamptz not null default now()
+);
+
+alter table public.app_logs enable row level security;
+
+drop policy if exists app_logs_select_admin on public.app_logs;
+create policy app_logs_select_admin on public.app_logs
+for select to authenticated using (public.current_user_role() = 'admin');
+
+drop policy if exists app_logs_insert_authenticated on public.app_logs;
+create policy app_logs_insert_authenticated on public.app_logs
+for insert to authenticated with check (auth.uid() = usuario_id or usuario_id is null);
+
+create or replace function public.log_app_table_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  record_reference text;
+begin
+  if tg_op = 'DELETE' then
+    record_reference := coalesce(to_jsonb(old) ->> 'id', to_jsonb(old) ->> 'clave', 'sin referencia');
+  else
+    record_reference := coalesce(to_jsonb(new) ->> 'id', to_jsonb(new) ->> 'clave', 'sin referencia');
+  end if;
+
+  insert into public.app_logs (modulo, accion, referencia, detalle, usuario_id, usuario_email)
+  values (
+    tg_table_name,
+    tg_op,
+    record_reference,
+    case tg_op
+      when 'INSERT' then 'Registro creado'
+      when 'UPDATE' then 'Registro modificado'
+      else 'Registro eliminado'
+    end,
+    auth.uid(),
+    coalesce(auth.jwt() ->> 'email', 'sistema')
+  );
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'profiles', 'clientes', 'templates', 'admin_promos', 'admin_promos_bancarias',
+    'admin_novedades', 'pedidos_mercaderia', 'arrepentimientos',
+    'facturacion_pedidos', 'facturacion_tiendas', 'facturacion_operadores',
+    'configuraciones_sistema'
+  ] loop
+    if to_regclass('public.' || table_name) is not null then
+      execute format('drop trigger if exists %I on public.%I', 'app_audit_' || table_name, table_name);
+      execute format(
+        'create trigger %I after insert or update or delete on public.%I for each row execute function public.log_app_table_change()',
+        'app_audit_' || table_name,
+        table_name
+      );
+    end if;
+  end loop;
+end;
+$$;
+
+do $$
+begin
+  if to_regclass('public.arrepentimientos_logs') is not null then
+    execute $migration$
+      insert into public.app_logs (modulo, accion, referencia, detalle, usuario_email, origen_id, created_at)
+      select 'Arrepentimientos', 'Error', referencia_fila, mensaje_error, usuario_email, id, coalesce(created_at, fecha, now())
+      from public.arrepentimientos_logs
+      on conflict (origen_id) do nothing
+    $migration$;
+  end if;
+end;
+$$;
+
+notify pgrst, 'reload schema';
+
+-- Desactiva promociones vencidas: web por fecha y hora, bancarias al finalizar su fecha de vigencia.
+create or replace function public.desactivar_promos_vencidas()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.admin_promos
+  set estado = 'Inactiva'
+  where fin is not null
+    and fin < now()
+    and coalesce(lower(estado), '') <> 'inactiva';
+
+  update public.admin_promos_bancarias
+  set estado_vigencia = 'INACTIVA', activa = false
+  where vigencia_fin is not null
+    and vigencia_fin < current_date
+    and (
+      coalesce(upper(estado_vigencia), '') <> 'INACTIVA'
+      or activa is distinct from false
+    );
+end;
+$$;
+
+revoke all on function public.desactivar_promos_vencidas() from public;
+grant execute on function public.desactivar_promos_vencidas() to authenticated;
 
 notify pgrst, 'reload schema';

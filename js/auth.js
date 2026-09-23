@@ -13,6 +13,7 @@ let currentUserModulePermissions = {};
 let currentModule = '';
 
 const APP_MODULES = ['admin', 'envios', 'pedidos', 'facturacion', 'arrepentimiento', 'seguimiento', 'plantillas'];
+const LAST_MODULE_STORAGE_KEY = 'lastVisitedModule';
 
 function getModulePermission(module) {
   return currentUserModulePermissions?.[module] || '';
@@ -110,6 +111,7 @@ async function navegar(seccion, elementoLink, subvista = '') {
   }
 
   currentModule = seccion;
+  localStorage.setItem(LAST_MODULE_STORAGE_KEY, seccion);
   closeSidebar();
   document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
   if (elementoLink) elementoLink.classList.add('active');
@@ -258,7 +260,14 @@ async function checkUser() {
     restaurarEstadoSidebar();
     const firstAccessibleLink = document.querySelector('.sidebar [data-module]:not([hidden]) .nav-link');
     const firstAccessibleModule = firstAccessibleLink?.closest('[data-module]')?.dataset.module;
-    if (firstAccessibleModule) navegar(firstAccessibleModule, firstAccessibleLink);
+    const lastModule = localStorage.getItem(LAST_MODULE_STORAGE_KEY);
+    const moduleToRestore = APP_MODULES.includes(lastModule) && canAccessModule(lastModule)
+      ? lastModule
+      : firstAccessibleModule;
+    const linkToRestore = moduleToRestore
+      ? document.querySelector(`.sidebar [data-module="${moduleToRestore}"] .nav-link`)
+      : null;
+    if (moduleToRestore) navegar(moduleToRestore, linkToRestore);
     else document.getElementById('mainContent').innerHTML = '<div class="alert alert-warning m-4">Tu usuario no tiene módulos asignados. Pedile a un administrador que habilite al menos uno.</div>';
   } else {
     currentUserRole = 'viewer';

@@ -22,9 +22,6 @@
    
     <button class="btn btn-outline-secondary btn-sm" onclick="cargarArrepentimientos()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
   
-    <button class="btn btn-outline-secondary btn-sm" id="btnVerLogsArrepentimiento" data-admin-only="true" onclick="abrirLogsArrepentimiento()">
-      <i class="bi bi-bug"></i> Logs de Errores
-    </button>
   </div>
 </div>
 <nav class="view-subnav mb-3" aria-label="Secciones de arrepentimientos">
@@ -128,35 +125,6 @@
         <tr><td colspan="15" class="text-center py-4">Cargando solicitudes...</td></tr>
       </tbody>
     </table>
-  </div>
-</div>
-
-<!-- MODAL DE LOGS DE ERRORES (Solo Admin) -->
-<div class="modal fade" id="modalLogsArrepentimiento" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-dark text-white py-2">
-        <h5 class="modal-title fs-6"><i class="bi bi-shield-exclamation text-warning me-2"></i>Logs de Errores de Procesamiento / Envíos</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-          <table class="table table-sm table-striped small mb-0">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Error Registrado</th>
-                <th>Fila/Ref</th>
-                <th>Usuario</th>
-              </tr>
-            </thead>
-            <tbody id="tblLogsArrepentimientoBody">
-              <tr><td colspan="4" class="text-center py-3">Cargando logs de auditoría...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 

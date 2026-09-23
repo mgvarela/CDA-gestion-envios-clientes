@@ -7,7 +7,8 @@
       </div>
       <div class="modal-body">
         <form id="formNuevaNovedad">
-          <div class="mb-2"><label class="form-label">ID Novedad</label><input type="text" id="nId" class="form-control" placeholder="PNO005" required></div>
+          <input type="hidden" id="nEditId">
+          <div class="mb-2"><label class="form-label">ID Novedad</label><input type="text" id="nId" class="form-control" readonly required></div>
           <div class="mb-2"><label class="form-label">Categoría</label><input type="text" id="nCategoria" class="form-control" placeholder="Medio de pago / Logística" required></div>
           <div class="mb-2"><label class="form-label">Descripción</label><textarea id="nDescripcion" class="form-control" rows="3" required></textarea></div>
         </form>

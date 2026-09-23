@@ -16,12 +16,18 @@ async function cargarDatosAdmin() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
 
+  await desactivarPromosVencidas();
   await Promise.all([
     cargarPromosWeb(),
     cargarPromosBancarias(),
     cargarNovedadesOperativas(),
     cargarUsuariosRoles()
   ]);
+}
+
+async function desactivarPromosVencidas() {
+  const { error } = await supabaseClient.rpc('desactivar_promos_vencidas');
+  if (error) console.error('No se pudieron actualizar las promociones vencidas:', error);
 }
 
 function mostrarPanelUsuarios() {
@@ -50,8 +56,22 @@ function mostrarPanelConfiguracion() {
   cargarConfiguracionesSistema();
 }
 
+function mostrarPanelLogs() {
+  document.querySelectorAll('#adminTabs .nav-link').forEach(link => link.classList.remove('active'));
+  document.querySelectorAll('.tab-content .tab-pane').forEach(panel => panel.classList.remove('show', 'active'));
+
+  const tab = document.getElementById('tab-logs');
+  const panel = document.getElementById('content-logs');
+  if (!tab || !panel) return;
+
+  tab.classList.add('active');
+  panel.classList.add('show', 'active');
+  cargarLogsApp();
+}
+
 window.mostrarPanelUsuarios = mostrarPanelUsuarios;
 window.mostrarPanelConfiguracion = mostrarPanelConfiguracion;
+window.mostrarPanelLogs = mostrarPanelLogs;
 window.abrirModalPlantillas = abrirModalPlantillas;
 window.actualizarEstadoTemplate = actualizarEstadoTemplate;
 window.actualizarVistaPreviaTemplate = actualizarVistaPreviaTemplate;
@@ -89,6 +109,54 @@ function isValidEmail(value) {
 function sanitizeTemplateId(value) {
   return sanitizeText(value, 80).replace(/[^a-zA-Z0-9_-]/g, '_');
 }
+
+async function registrarLogApp(modulo, accion, referencia = '', detalle = '') {
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    await supabaseClient.from('app_logs').insert([{
+      modulo: sanitizeText(modulo, 80),
+      accion: sanitizeText(accion, 80),
+      referencia: sanitizeText(referencia, 160),
+      detalle: sanitizeText(detalle, 1000),
+      usuario_id: session?.user?.id || null,
+      usuario_email: session?.user?.email || 'sistema'
+    }]);
+  } catch (error) {
+    console.error('No se pudo registrar la actividad:', error);
+  }
+}
+
+async function cargarLogsApp() {
+  if (!(await requireAuth()) || !canDelete()) return;
+  const tbody = document.getElementById('tblLogsApp');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando registros...</td></tr>';
+  const { data, error } = await supabaseClient
+    .from('app_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">No se pudieron cargar los registros: ${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = (data || []).map(log => `
+    <tr>
+      <td><small>${log.created_at ? new Date(log.created_at).toLocaleString('es-AR') : '-'}</small></td>
+      <td><span class="badge text-bg-secondary">${escapeHtml(log.modulo || '-')}</span></td>
+      <td><span class="badge text-bg-danger">${escapeHtml(log.accion || '-')}</span></td>
+      <td><code>${escapeHtml(log.referencia || '-')}</code></td>
+      <td>${escapeHtml(log.detalle || '-')}</td>
+      <td>${escapeHtml(log.usuario_email || 'sistema')}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="text-center py-3">No hay actividad registrada.</td></tr>';
+}
+
+window.registrarLogApp = registrarLogApp;
+window.cargarLogsApp = cargarLogsApp;
 
 async function cargarDatosEnvios() {
   const sessionOk = await requireAuth();
@@ -548,17 +616,19 @@ async function cargarPromosWeb() {
     tbody.innerHTML += `
       <tr>
         <td><input type="checkbox" class="chk-promo" value="${p.id}"></td>
-        <td><small class="fw-bold">${p.id}</small></td>
+        <td><small class="fw-bold">${p.codigo || p.id}</small></td>
         <td><strong>${p.promo}</strong></td>
         <td><small>${p.inicio ? new Date(p.inicio).toLocaleDateString() : '-'}</small></td>
         <td><small>${p.fin ? new Date(p.fin).toLocaleDateString() : '-'}</small></td>
         <td><a href="${p.landing || '#'}" target="_blank">Link</a></td>
-        <td><span class="badge bg-secondary">${p.canal || 'web'}</span></td>
+        <td><span class="badge text-bg-info">${p.canal || 'web'}</span></td>
         <td><span class="badge ${p.estado === 'Activa' ? 'bg-success' : 'bg-danger'}">${p.estado}</span></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" type="button" onclick="abrirEdicionAdmin('promos', '${p.id}')" data-role-action="write" title="Editar promoción"><i class="bi bi-pencil"></i></button></td>
       </tr>`;
   });
   if (document.getElementById('kpiPromosActivas')) document.getElementById('kpiPromosActivas').innerText = activas;
   if (document.getElementById('kpiPromosInactivas')) document.getElementById('kpiPromosInactivas').innerText = inactivas;
+  applyRolePermissions();
 }
 
 async function cargarPromosBancarias() {
@@ -574,17 +644,19 @@ async function cargarPromosBancarias() {
     tbody.innerHTML += `
       <tr>
         <td><input type="checkbox" class="chk-bancaria" value="${p.id}"></td>
-        <td><small class="fw-bold">${p.id}</small></td>
+        <td><small class="fw-bold">${p.codigo || p.id}</small></td>
         <td><strong>${p.banco || '-'}</strong></td>
         <td>${p.descuento || '-'}</td>
         <td>${p.cuotas || '-'}</td>
         <td><small>${p.vigencia_inicio || '-'}${p.vigencia_fin ? ` al ${p.vigencia_fin}` : ''}</small></td>
         <td>${p.alcance || '-'}</td>
         <td><span class="badge ${((p.estado_vigencia || '').toUpperCase() === 'ACTIVA' || p.activa === 'SI' || p.activa === true) ? 'bg-success' : 'bg-secondary'}">${p.estado_vigencia || (p.activa === 'SI' ? 'Activa' : 'Inactiva')}</span></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" type="button" onclick="abrirEdicionAdmin('bancarias', '${p.id}')" data-role-action="write" title="Editar promo bancaria"><i class="bi bi-pencil"></i></button></td>
       </tr>`;
   });
 
   if (document.getElementById('kpiPromosBancarias')) document.getElementById('kpiPromosBancarias').innerText = activas;
+  applyRolePermissions();
 }
 
 async function cargarNovedadesOperativas() {
@@ -598,14 +670,16 @@ async function cargarNovedadesOperativas() {
     tbody.innerHTML += `
       <tr>
         <td><input type="checkbox" class="chk-novedad" value="${n.id}"></td>
-        <td><small class="fw-bold">${n.id}</small></td>
+        <td><small class="fw-bold">${n.codigo || n.id}</small></td>
         <td>${n.categoria || '-'}</td>
         <td>${n.descripcion || '-'}</td>
         <td><span class="badge ${n.activa === 'Si' || n.activa === true ? 'bg-success' : 'bg-secondary'}">${n.activa || 'No'}</span></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" type="button" onclick="abrirEdicionAdmin('novedades', '${n.id}')" data-role-action="write" title="Editar novedad"><i class="bi bi-pencil"></i></button></td>
       </tr>`;
   });
 
   if (document.getElementById('kpiNovedades')) document.getElementById('kpiNovedades').innerText = novedades.length;
+  applyRolePermissions();
 }
 
 async function cargarUsuariosRoles() {
@@ -756,6 +830,117 @@ async function guardarPermisoUsuario(userId) {
 }
 
 // GUARDADO DE REGISTROS
+async function siguienteIdAdmin(tabla, prefijo) {
+  const { data, error } = await supabaseClient.from(tabla).select('codigo');
+  if (error) throw error;
+
+  const ids = data || [];
+  const pattern = new RegExp(`^${prefijo}(\\d+)$`, 'i');
+  const consecutivo = ids.reduce((mayor, item) => {
+    const match = String(item.codigo || '').match(pattern);
+    return match ? Math.max(mayor, Number(match[1])) : mayor;
+  }, 0) + 1;
+  return `${prefijo}${String(consecutivo).padStart(3, '0')}`;
+}
+
+async function abrirModalAdmin(tipo) {
+  if (!(await requireAuth()) || !canWrite('admin')) return mostrarNotificacion('No tenés permisos para crear registros.', 'danger');
+
+  const configuraciones = {
+    promos: { tabla: 'admin_promos', prefijo: 'P', modal: 'modalNuevaPromo', form: 'formNuevaPromo', input: 'pId', edit: 'pEditId' },
+    bancarias: { tabla: 'admin_promos_bancarias', prefijo: 'PB', modal: 'modalNuevaPromoBancaria', form: 'formNuevaPromoBancaria', input: 'pbId', edit: 'pbEditId' },
+    novedades: { tabla: 'admin_novedades', prefijo: 'PNO', modal: 'modalNuevaNovedad', form: 'formNuevaNovedad', input: 'nId', edit: 'nEditId' }
+  };
+  const configuracion = configuraciones[tipo];
+  if (!configuracion) return;
+
+  const modalEl = document.getElementById(configuracion.modal);
+  const form = document.getElementById(configuracion.form);
+  const inputId = document.getElementById(configuracion.input);
+  if (!modalEl || !form || !inputId) return mostrarNotificacion('No se pudo abrir el formulario.', 'danger');
+
+  form.reset();
+  document.getElementById(configuracion.edit).value = '';
+  inputId.value = 'Generando...';
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+  try {
+    inputId.value = await siguienteIdAdmin(configuracion.tabla, configuracion.prefijo);
+  } catch (error) {
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    mostrarNotificacion('No se pudo generar el ID consecutivo: ' + error.message, 'danger');
+  }
+}
+
+function fechaHoraLocalAdmin(value) {
+  if (!value) return '';
+  const fecha = new Date(value);
+  if (Number.isNaN(fecha.getTime())) return String(value).slice(0, 16);
+  return new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+async function abrirEdicionAdmin(tipo, id) {
+  if (!(await requireAuth()) || !canWrite('admin')) return mostrarNotificacion('No tenés permisos para editar registros.', 'danger');
+
+  const configuraciones = {
+    promos: { tabla: 'admin_promos', modal: 'modalNuevaPromo', form: 'formNuevaPromo', input: 'pId', edit: 'pEditId', cargar: cargarPromosWeb },
+    bancarias: { tabla: 'admin_promos_bancarias', modal: 'modalNuevaPromoBancaria', form: 'formNuevaPromoBancaria', input: 'pbId', edit: 'pbEditId', cargar: cargarPromosBancarias },
+    novedades: { tabla: 'admin_novedades', modal: 'modalNuevaNovedad', form: 'formNuevaNovedad', input: 'nId', edit: 'nEditId', cargar: cargarNovedadesOperativas }
+  };
+  const configuracion = configuraciones[tipo];
+  if (!configuracion) return;
+
+  const { data, error } = await supabaseClient.from(configuracion.tabla).select('*').eq('id', id).maybeSingle();
+  if (error || !data) return mostrarNotificacion('No se pudo cargar el registro: ' + (error?.message || 'no encontrado'), 'danger');
+
+  document.getElementById(configuracion.form)?.reset();
+  document.getElementById(configuracion.edit).value = data.id;
+  document.getElementById(configuracion.input).value = data.codigo || data.id;
+
+  if (tipo === 'promos') {
+    document.getElementById('pNombre').value = data.promo || '';
+    document.getElementById('pInicio').value = fechaHoraLocalAdmin(data.inicio);
+    document.getElementById('pFin').value = fechaHoraLocalAdmin(data.fin);
+    document.getElementById('pLanding').value = data.landing || '';
+    document.getElementById('pObs').value = data.observaciones || '';
+  } else if (tipo === 'bancarias') {
+    document.getElementById('pbBanco').value = data.banco || '';
+    document.getElementById('pbDescuento').value = data.descuento || '';
+    document.getElementById('pbCuotas').value = data.cuotas || '';
+    document.getElementById('pbInicio').value = data.vigencia_inicio || '';
+    document.getElementById('pbFin').value = data.vigencia_fin || '';
+    document.getElementById('pbAlcance').value = data.alcance || '';
+  } else {
+    document.getElementById('nCategoria').value = data.categoria || '';
+    document.getElementById('nDescripcion').value = data.descripcion || '';
+  }
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById(configuracion.modal)).show();
+}
+
+async function guardarNuevaPromo() {
+  if (!(await requireAuth()) || !canWrite('admin')) return;
+
+  const codigo = sanitizeTemplateId(document.getElementById('pId').value);
+  const promo = sanitizeText(document.getElementById('pNombre').value, 150);
+  const inicio = document.getElementById('pInicio').value;
+  const fin = document.getElementById('pFin').value;
+  const landing = sanitizeText(document.getElementById('pLanding').value, 500);
+  const observaciones = sanitizeText(document.getElementById('pObs').value, 500);
+  const editId = document.getElementById('pEditId').value;
+  if (!codigo || !promo || !inicio || !fin || !landing) return mostrarNotificacion('Completá todos los campos obligatorios.', 'warning');
+
+  const payload = { codigo, promo, inicio, fin, landing, observaciones, canal: 'web' };
+  const { error } = editId
+    ? await supabaseClient.from('admin_promos').update(payload).eq('id', editId)
+    : await supabaseClient.from('admin_promos').insert([{ ...payload, estado: 'Activa' }]);
+  if (error) return mostrarNotificacion(`No se pudo ${editId ? 'actualizar' : 'guardar'} la promoción: ${error.message}`, 'danger');
+
+  bootstrap.Modal.getInstance(document.getElementById('modalNuevaPromo'))?.hide();
+  mostrarNotificacion(editId ? 'Promoción actualizada correctamente.' : 'Promoción guardada correctamente.', 'success');
+  await cargarPromosWeb();
+}
+
 async function guardarNuevaPromoBancaria() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
@@ -764,22 +949,24 @@ async function guardarNuevaPromoBancaria() {
     return;
   }
 
-  const id = sanitizeTemplateId(document.getElementById('pbId').value);
+  const codigo = sanitizeTemplateId(document.getElementById('pbId').value);
   const banco = sanitizeText(document.getElementById('pbBanco').value, 80);
   const descuento = sanitizeText(document.getElementById('pbDescuento').value, 80);
   const cuotas = sanitizeText(document.getElementById('pbCuotas').value, 30);
   const vigencia_inicio = document.getElementById('pbInicio').value;
   const vigencia_fin = document.getElementById('pbFin').value;
   const alcance = sanitizeText(document.getElementById('pbAlcance').value, 150);
+  const editId = document.getElementById('pbEditId').value;
 
-  const { error } = await supabaseClient.from('admin_promos_bancarias').insert([{
-    id, banco, descuento, cuotas, vigencia_inicio, vigencia_fin, alcance, activa: 'SI', estado_vigencia: 'ACTIVA'
-  }]);
+  const payload = { codigo, banco, descuento, cuotas, vigencia_inicio, vigencia_fin, alcance };
+  const { error } = editId
+    ? await supabaseClient.from('admin_promos_bancarias').update(payload).eq('id', editId)
+    : await supabaseClient.from('admin_promos_bancarias').insert([{ ...payload, activa: true, estado_vigencia: 'ACTIVA' }]);
 
   if (error) mostrarNotificacion("Error: " + error.message, 'danger');
   else {
     bootstrap.Modal.getInstance(document.getElementById('modalNuevaPromoBancaria')).hide();
-    mostrarNotificacion('Promo bancaria guardada correctamente.', 'success');
+    mostrarNotificacion(editId ? 'Promo bancaria actualizada correctamente.' : 'Promo bancaria guardada correctamente.', 'success');
     cargarPromosBancarias();
   }
 }
@@ -792,16 +979,20 @@ async function guardarNuevaNovedad() {
     return;
   }
 
-  const id = sanitizeTemplateId(document.getElementById('nId').value);
+  const codigo = sanitizeTemplateId(document.getElementById('nId').value);
   const categoria = sanitizeText(document.getElementById('nCategoria').value, 80);
   const descripcion = sanitizeText(document.getElementById('nDescripcion').value, 400);
+  const editId = document.getElementById('nEditId').value;
 
-  const { error } = await supabaseClient.from('admin_novedades').insert([{ id, categoria, descripcion, activa: 'Si' }]);
+  const payload = { codigo, categoria, descripcion };
+  const { error } = editId
+    ? await supabaseClient.from('admin_novedades').update(payload).eq('id', editId)
+    : await supabaseClient.from('admin_novedades').insert([{ ...payload, activa: 'Si' }]);
 
   if (error) mostrarNotificacion("Error: " + error.message, 'danger');
   else {
     bootstrap.Modal.getInstance(document.getElementById('modalNuevaNovedad')).hide();
-    mostrarNotificacion('Novedad guardada correctamente.', 'success');
+    mostrarNotificacion(editId ? 'Novedad actualizada correctamente.' : 'Novedad guardada correctamente.', 'success');
     cargarNovedadesOperativas();
   }
 }
@@ -950,7 +1141,7 @@ async function cargarConfiguracionesSistema() {
       <tr data-config-key="${item.clave}">
         <td>
           <strong class="font-monospace small text-primary">${escapeHtml(item.clave)}</strong>
-          ${item.es_secreta ? '<span class="badge bg-secondary ms-1 small">Secreta</span>' : ''}
+          ${item.es_secreta ? '<span class="badge text-bg-infoms-1 small">Secreta</span>' : ''}
         </td>
         <td>
           <small class="text-muted">${escapeHtml(item.descripcion || '-')}</small>

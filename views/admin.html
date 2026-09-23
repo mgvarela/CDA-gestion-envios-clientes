@@ -53,6 +53,11 @@
       <i class="bi bi-gear-wide-connected"></i> Configuración / APIs
     </button>
   </li>
+  <li class="nav-item" data-admin-only="true">
+    <button class="nav-link w-100" id="tab-logs" type="button" onclick="window.mostrarPanelLogs()">
+      <i class="bi bi-journal-text"></i> Registro de actividad
+    </button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -63,7 +68,7 @@
         <h5 class="mb-0">Listado de Promociones</h5>
         <div>
           <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('promos')" data-role-action="write" id="btnEnviarPromos"><i class="bi bi-envelope-at"></i> Enviar</button>
-          <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromo" data-role-action="write" id="btnNuevaPromo"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" onclick="abrirModalAdmin('promos')" data-role-action="write" id="btnNuevaPromo"><i class="bi bi-plus-lg"></i> Nueva</button>
           <select class="form-select form-select-sm d-inline-block bulk-action-control" id="bulkEstadoPromos" aria-label="Estado de promociones"><option value="">Cambiar estado...</option><option value="Activa">Activa</option><option value="Inactiva">Inactiva</option></select>
           <button class="btn btn-primary btn-sm" onclick="actualizarSeleccionAdmin('promos')" data-role-action="write"><i class="bi bi-check2"></i> Aplicar</button>
           <button class="btn btn-outline-danger btn-sm" onclick="eliminarSeleccionAdmin('promos')" data-role-action="delete"><i class="bi bi-trash"></i></button>
@@ -74,10 +79,10 @@
           <thead class="table-light">
             <tr>
               <th width="40"><input type="checkbox" id="chkAllPromos" onclick="toggleSelectAll('chkAllPromos', 'chk-promo')"></th>
-              <th>ID</th><th>Promo</th><th>Inicio</th><th>Fin</th><th>Landing</th><th>Canal</th><th>Estado</th>
+              <th>ID</th><th>Promo</th><th>Inicio</th><th>Fin</th><th>Landing</th><th>Canal</th><th>Estado</th><th class="text-end">Acción</th>
             </tr>
           </thead>
-          <tbody id="tblAdminPromos"><tr><td colspan="8" class="text-center py-3">Cargando...</td></tr></tbody>
+          <tbody id="tblAdminPromos"><tr><td colspan="9" class="text-center py-3">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -90,7 +95,7 @@
         <h5 class="mb-0">Listado de Convenios Bancarios</h5>
         <div>
           <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('bancarias')" data-role-action="write" id="btnEnviarBancarias"><i class="bi bi-envelope-at"></i> Enviar</button>
-          <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaPromoBancaria" data-role-action="write" id="btnNuevaPromoBancaria"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" onclick="abrirModalAdmin('bancarias')" data-role-action="write" id="btnNuevaPromoBancaria"><i class="bi bi-plus-lg"></i> Nueva</button>
           <select class="form-select form-select-sm d-inline-block bulk-action-control" id="bulkEstadoBancarias" aria-label="Estado de promociones bancarias"><option value="">Cambiar estado...</option><option value="ACTIVA">Activa</option><option value="INACTIVA">Inactiva</option></select>
           <button class="btn btn-primary btn-sm" onclick="actualizarSeleccionAdmin('bancarias')" data-role-action="write"><i class="bi bi-check2"></i> Aplicar</button>
           <button class="btn btn-outline-danger btn-sm" onclick="eliminarSeleccionAdmin('bancarias')" data-role-action="delete"><i class="bi bi-trash"></i></button>
@@ -101,10 +106,10 @@
           <thead class="table-light">
             <tr>
               <th width="40"><input type="checkbox" id="chkAllBancarias" onclick="toggleSelectAll('chkAllBancarias', 'chk-bancaria')"></th>
-              <th>ID</th><th>Banco</th><th>Descuento</th><th>Cuotas</th><th>Vigencia</th><th>Alcance</th><th>Estado</th>
+              <th>ID</th><th>Banco</th><th>Descuento</th><th>Cuotas</th><th>Vigencia</th><th>Alcance</th><th>Estado</th><th class="text-end">Acción</th>
             </tr>
           </thead>
-          <tbody id="tblAdminBancarias"><tr><td colspan="8" class="text-center py-3">Cargando...</td></tr></tbody>
+          <tbody id="tblAdminBancarias"><tr><td colspan="9" class="text-center py-3">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -117,7 +122,7 @@
         <h5 class="mb-0">Novedades y Medios de Pago</h5>
         <div>
           <button class="btn btn-success btn-sm me-1" onclick="enviarMailsSeleccionados('novedades')" data-role-action="write" id="btnEnviarNovedades"><i class="bi bi-envelope-at"></i> Enviar</button>
-          <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaNovedad" data-role-action="write" id="btnNuevaNovedad"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" onclick="abrirModalAdmin('novedades')" data-role-action="write" id="btnNuevaNovedad"><i class="bi bi-plus-lg"></i> Nueva</button>
           <select class="form-select form-select-sm d-inline-block bulk-action-control" id="bulkEstadoNovedades" aria-label="Estado de novedades"><option value="">Cambiar estado...</option><option value="Si">Activa</option><option value="No">Inactiva</option></select>
           <button class="btn btn-primary btn-sm" onclick="actualizarSeleccionAdmin('novedades')" data-role-action="write"><i class="bi bi-check2"></i> Aplicar</button>
           <button class="btn btn-outline-danger btn-sm" onclick="eliminarSeleccionAdmin('novedades')" data-role-action="delete"><i class="bi bi-trash"></i></button>
@@ -128,10 +133,10 @@
           <thead class="table-light">
             <tr>
               <th width="40"><input type="checkbox" id="chkAllNovedades" onclick="toggleSelectAll('chkAllNovedades', 'chk-novedad')"></th>
-              <th>ID</th><th>Categoría</th><th>Descripción</th><th>Activa</th>
+              <th>ID</th><th>Categoría</th><th>Descripción</th><th>Activa</th><th class="text-end">Acción</th>
             </tr>
           </thead>
-          <tbody id="tblAdminNovedades"><tr><td colspan="5" class="text-center py-3">Cargando...</td></tr></tbody>
+          <tbody id="tblAdminNovedades"><tr><td colspan="6" class="text-center py-3">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -194,6 +199,33 @@
           <tbody id="tblConfiguracionesSistema">
             <tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando configuraciones...</td></tr>
           </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="content-logs">
+    <div class="card p-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h5 class="mb-1"><i class="bi bi-journal-text text-primary me-1"></i>Registro global de actividad</h5>
+          <p class="text-muted small mb-0">Altas, modificaciones, eliminaciones y errores registrados en la aplicación.</p>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" type="button" onclick="cargarLogsApp()"><i class="bi bi-arrow-clockwise"></i> Recargar</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Fecha</th>
+              <th>Módulo</th>
+              <th>Acción</th>
+              <th>Referencia</th>
+              <th>Detalle</th>
+              <th>Usuario</th>
+            </tr>
+          </thead>
+          <tbody id="tblLogsApp"><tr><td colspan="6" class="text-center py-3">Cargando registros...</td></tr></tbody>
         </table>
       </div>
     </div>
