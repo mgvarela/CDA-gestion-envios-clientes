@@ -29,9 +29,12 @@ function renderTablaEnvios() {
     if (c.estado === 'error') badgeClass = 'badge-error';
 
     let selectOptions = `<option value="">Seleccionar plantilla...</option>`;
-    templatesData.forEach(t => {
+    templatesData.filter(t => {
+      const modulo = String(t.modulo || 'todos').trim().toLowerCase();
+      return ['todos', 'envios'].includes(modulo);
+    }).forEach(t => {
       let isSelected = (String(t.id).trim() === String(c.template_id).trim()) ? 'selected' : '';
-      selectOptions += `<option value="${t.id}" ${isSelected}>${t.nombre}</option>`;
+      selectOptions += `<option value="${t.id}" ${isSelected}>${t.id}</option>`;
     });
 
     tbody.innerHTML += `

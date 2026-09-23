@@ -5,6 +5,18 @@
 let pedidosMercaderia = [];
 let plantillasEmailData = [];
 
+function plantillasPorModulo(modulo) {
+  const moduloNormalizado = String(modulo || '').trim().toLowerCase();
+  return plantillasEmailData.filter(template => {
+    const moduloTemplate = String(template.modulo || 'todos').trim().toLowerCase();
+    return ['todos', moduloNormalizado].includes(moduloTemplate);
+  });
+}
+
+function etiquetaPlantilla(template) {
+  return template.id || 'sin-id';
+}
+
 async function cargarPlantillasEmail() {
   const { data, error } = await supabaseClient.from('templates').select('*').order('nombre');
   if (error) {
@@ -14,8 +26,8 @@ async function cargarPlantillasEmail() {
   plantillasEmailData = (data || []).filter(template => template.activo !== false);
   const bulkTemplate = document.getElementById('bulkPlantillaPedido');
   if (bulkTemplate) {
-    bulkTemplate.innerHTML = '<option value="">Cambiar plantilla...</option>' + plantillasEmailData
-      .map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.nombre || template.id)}</option>`)
+    bulkTemplate.innerHTML = '<option value="">Cambiar plantilla...</option>' + plantillasPorModulo('pedidos')
+      .map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(etiquetaPlantilla(template))}</option>`)
       .join('');
   }
   return plantillasEmailData;
@@ -23,9 +35,9 @@ async function cargarPlantillasEmail() {
 
 function opcionesPlantillasEmail(templateId) {
   const options = ['<option value="">Seleccionar plantilla...</option>'];
-  plantillasEmailData.forEach(template => {
+  plantillasPorModulo('pedidos').forEach(template => {
     const selected = String(template.id) === String(templateId || '') ? ' selected' : '';
-    options.push(`<option value="${escapeHtml(template.id)}"${selected}>${escapeHtml(template.nombre || template.id)}</option>`);
+    options.push(`<option value="${escapeHtml(template.id)}"${selected}>${escapeHtml(etiquetaPlantilla(template))}</option>`);
   });
   return options.join('');
 }

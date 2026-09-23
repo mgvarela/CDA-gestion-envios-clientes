@@ -152,10 +152,13 @@ function renderTablaEnvios() {
     placeholder.textContent = 'Seleccionar plantilla...';
     select.appendChild(placeholder);
 
-    templatesData.forEach(t => {
+    templatesData.filter(t => {
+      const modulo = String(t.modulo || 'todos').trim().toLowerCase();
+      return ['todos', 'envios'].includes(modulo);
+    }).forEach(t => {
       const option = document.createElement('option');
       option.value = String(t.id);
-      option.textContent = sanitizeText(t.nombre, 80) || 'Plantilla';
+      option.textContent = sanitizeText(t.id, 80) || 'Plantilla';
       if (String(t.id).trim() === String(c.template_id).trim()) option.selected = true;
       select.appendChild(option);
     });
@@ -218,12 +221,12 @@ function renderTemplates() {
     item.className = 'list-group-item';
 
     const title = document.createElement('strong');
-    title.textContent = sanitizeText(t.nombre, 80) || 'Plantilla';
+    title.textContent = sanitizeText(t.id, 50) || 'sin-id';
     item.appendChild(title);
 
     const meta = document.createElement('small');
     meta.className = 'text-muted';
-    meta.textContent = ` (${sanitizeText(t.id, 50)}) - ${sanitizeText(t.modulo || 'todos', 40)} - ${sanitizeText(t.estado || 'general', 50)}`;
+    meta.textContent = ` ${sanitizeText(t.modulo || 'todos', 40)} - ${sanitizeText(t.estado || 'general', 50)}`;
     item.appendChild(meta);
 
     const br = document.createElement('br');
@@ -233,40 +236,51 @@ function renderTemplates() {
     body.textContent = sanitizeText(t.cuerpo, 500) || '-';
     item.appendChild(body);
 
-    const editButton = document.createElement('button');
-    editButton.type = 'button';
-    editButton.className = 'btn btn-sm btn-outline-primary mt-2 me-2';
-    editButton.innerHTML = '<i class="bi bi-pencil"></i> Editar';
-    editButton.addEventListener('click', () => editarTemplate(t.id));
-    item.appendChild(editButton);
+    // 1. Crear el contenedor flexbox para alinear todos los controles
+const actionsContainer = document.createElement('div');
+actionsContainer.className = 'd-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top';
 
-    const active = document.createElement('div');
-    active.className = 'form-check form-switch mt-2';
-    const activeInput = document.createElement('input');
-    activeInput.type = 'checkbox';
-    activeInput.className = 'form-check-input';
-    activeInput.checked = t.activo !== false;
-    activeInput.id = `template-active-${sanitizeTemplateId(t.id)}`;
-    activeInput.addEventListener('change', () => actualizarEstadoTemplate(t.id, activeInput.checked));
-    const activeLabel = document.createElement('label');
-    activeLabel.className = 'form-check-label';
-    activeLabel.htmlFor = activeInput.id;
-    activeLabel.textContent = 'Disponible para seleccionar';
-    active.appendChild(activeInput);
-    active.appendChild(activeLabel);
-    item.appendChild(active);
+// 2. Botón Editar
+const editButton = document.createElement('button');
+editButton.type = 'button';
+editButton.className = 'btn btn-sm btn-outline-primary';
+editButton.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+editButton.addEventListener('click', () => editarTemplate(t.id));
+actionsContainer.appendChild(editButton);
 
-    if (canDelete()) {
-      const actions = document.createElement('div');
-      actions.className = 'mt-2';
-      const deleteButton = document.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'btn btn-sm btn-outline-danger';
-      deleteButton.innerHTML = '<i class="bi bi-trash3"></i> Eliminar referencia';
-      deleteButton.addEventListener('click', () => eliminarTemplate(t.id));
-      actions.appendChild(deleteButton);
-      item.appendChild(actions);
-    }
+// 3. Botón Eliminar (solo si tiene permisos)
+if (canDelete()) { // Asumiendo que esta función de auth.js está en scope
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'btn btn-sm btn-outline-danger';
+  deleteButton.innerHTML = '<i class="bi bi-trash3"></i> Eliminar';
+  deleteButton.addEventListener('click', () => eliminarTemplate(t.id));
+  actionsContainer.appendChild(deleteButton);
+}
+
+// 4. Switch de estado (Activo/Inactivo)
+const active = document.createElement('div');
+// ms-auto empuja este elemento hacia el extremo derecho del contenedor
+active.className = 'form-check form-switch mb-0 ms-auto'; 
+
+const activeInput = document.createElement('input');
+activeInput.type = 'checkbox';
+activeInput.className = 'form-check-input';
+activeInput.checked = t.activo !== false;
+activeInput.id = `template-active-${sanitizeTemplateId(t.id)}`;
+activeInput.addEventListener('change', () => actualizarEstadoTemplate(t.id, activeInput.checked));
+
+const activeLabel = document.createElement('label');
+activeLabel.className = 'form-check-label small text-muted';
+activeLabel.htmlFor = activeInput.id;
+activeLabel.textContent = 'Activo'; // Texto reducido para mejor encuadre
+
+active.appendChild(activeInput);
+active.appendChild(activeLabel);
+actionsContainer.appendChild(active);
+
+// 5. Finalmente, agregamos el contenedor de acciones al card/item principal
+item.appendChild(actionsContainer);
 
     list.appendChild(item);
   });

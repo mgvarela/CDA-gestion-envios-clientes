@@ -8,9 +8,7 @@
       <div class="modal-body">
         <form id="formTemplate" class="mb-4">
           <h6>Generador de plantillas</h6>
-          <p class="small text-muted mb-2">
-            El diseño base se mantiene en EmailJS. Acá podés crear y editar el asunto y el texto que recibirá el cliente.
-          </p>
+         
           <div class="row g-2 mb-2">
             <div class="col-md-4">
               <input type="text" id="tplId" class="form-control" placeholder="Identificador interno (ej: arrepentimiento_cliente)" required>
@@ -39,6 +37,8 @@
             <select id="tplEstado" class="form-select">
               <option value="">Template general del módulo</option>
               <option value="Devuelve Sucursal">Devuelve Sucursal</option>
+              <option value="Aviso Transferencia">Aviso Transferencia</option>
+              <option value="Reembolso / anulacion Automatica">Reembolso / anulacion Automatica</option>
               <option value="Avisar a Sucursal">Avisar a Sucursal</option>
               <option value="Pendiente de Caja">Pendiente de Caja</option>
               <option value="Notificado">Notificado</option>

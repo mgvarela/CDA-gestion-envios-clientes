@@ -35,7 +35,10 @@ h6, .h6 { font-size: 0.8rem !important; }
 .bg-secondary {
   background-color: #e2e3e5 !important;
 }
-
+.logo-login  {
+  width: 50%;
+  margin: 10px auto 20px;
+}
 #appSection > .row {
   display: flex;
   flex-wrap: nowrap;
@@ -624,6 +627,12 @@ h6, .h6 { font-size: 0.8rem !important; }
 #modalConfirmacionGlobal .modal-content {
     background-color: #d1ecf1 !important;
     border-color: #bee5eb !important;
+}
+
+/* MODAL PLANTILLA */
+.list-group {
+    overflow-y: scroll;
+    height: 500px;
 }
 /* Adaptabilidad Móvil y Pantallas Pequeñas (< 768px) */
 @media (max-width: 767.98px) {

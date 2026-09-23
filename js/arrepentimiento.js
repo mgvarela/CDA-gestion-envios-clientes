@@ -110,7 +110,10 @@ function obtenerPlantillaConfiguradaArrepentimiento(estado) {
 function opcionesPlantillasArrepentimiento(templateId = '') {
   const templates = typeof plantillasEmailData !== 'undefined' ? plantillasEmailData : [];
   return `<option value="">Sin plantilla específica</option>${templates
-    .filter(template => template.activo !== false)
+    .filter(template => {
+      const modulo = String(template.modulo || 'todos').trim().toLowerCase();
+      return template.activo !== false && ['arrepentimiento', 'todos'].includes(modulo);
+    })
     .map(template => `<option value="${escapeHtml(template.id)}" ${String(template.id) === String(templateId) ? 'selected' : ''}>${escapeHtml(template.id)}</option>`)
     .join('')}`;
 }
@@ -255,7 +258,7 @@ function renderizarArrepentimientos() {
 
   const opcionesEstado = vistaArrepentimientos === 'caja'
     ? ['Enviado a Caja']
-    : ['Devuelve Sucursal', 'Avisar a Sucursal', 'Notificado', 'Retiro en domicilio', 'Enviado a Caja', 'Pre Cerrado', 'Cerrado', 'Cerrado sin gestion', 'Otros'];
+    : ['Devuelve Sucursal', 'Aviso Transferencia', 'Reembolso / anulacion Automatica', 'Notificado', 'Retiro en domicilio', 'Enviado a Caja', 'Pre Cerrado', 'Cerrado', 'Cerrado sin gestion', 'Otros'];
 
   tbody.innerHTML = filtrados.map(item => {
     const pId = item.pedido_id || item.numero_pedido || item.pedido || '-';
@@ -272,6 +275,9 @@ function renderizarArrepentimientos() {
       : [...canalesArrepentimiento, { value: canalActual, label: canalActual }];
     
     const opcionesPlantillaHtml = opcionesPlantillasArrepentimiento(item.template_id);
+    const opcionesEstadoFila = ['Devuelve Sucursal', 'Avisar a Sucursal'].includes(item.estado)
+      ? [...opcionesEstado, 'Avisar a Sucursal']
+      : opcionesEstado;
 
     return `
       <tr data-id="${item.id}">
@@ -300,14 +306,14 @@ function renderizarArrepentimientos() {
           </select>
         </td>
         <td>
-          <select class="form-select form-select-sm" onchange="actualizarArrepentimientoField('${item.id}', 'template_id', this.value)">
-            ${opcionesPlantillaHtml}
+          <select class="form-select form-select-sm" onchange="cambiarEstadoArrepentimiento('${item.id}', this.value)" ${esCaja ? 'disabled' : ''}>
+            ${opcionesEstadoFila.map(opt => `<option value="${opt}" ${item.estado === opt ? 'selected' : ''}>${esCaja && opt === 'Enviado a Caja' ? 'Pendiente de Caja' : opt}</option>`).join('')}
+            ${!opcionesEstadoFila.includes(item.estado) && item.estado ? `<option value="${escapeHtml(item.estado)}" selected>${escapeHtml(item.estado)}</option>` : ''}
           </select>
         </td>
         <td>
-          <select class="form-select form-select-sm" onchange="cambiarEstadoArrepentimiento('${item.id}', this.value)" ${esCaja ? 'disabled' : ''}>
-            ${opcionesEstado.map(opt => `<option value="${opt}" ${item.estado === opt ? 'selected' : ''}>${esCaja && opt === 'Enviado a Caja' ? 'Pendiente de Caja' : opt}</option>`).join('')}
-            ${!opcionesEstado.includes(item.estado) && item.estado ? `<option value="${escapeHtml(item.estado)}" selected>${escapeHtml(item.estado)}</option>` : ''}
+          <select class="form-select form-select-sm" onchange="actualizarArrepentimientoField('${item.id}', 'template_id', this.value)">
+            ${opcionesPlantillaHtml}
           </select>
         </td>
         <td>
@@ -863,9 +869,14 @@ async function enviarMailArrepentimiento(id, mostrarResultado = true, modo = 'ma
       ? 'Enviado a Caja'
       : esAvisoSucursal
         ? 'Notificado'
+      : esAvisoClienteSucursal
+        ? 'Avisar a Sucursal'
       : esCaja
         ? 'Pre Cerrado'
         : item.estado;
+    const plantillaLuegoDelEnvio = esAvisoClienteSucursal
+      ? obtenerPlantillaConfiguradaArrepentimiento('Avisar a Sucursal')?.id || item.template_id || null
+      : item.template_id || null;
     const destinatarioLuegoDelEnvio = esAvisoAutomaticoCaja
       ? getDestinatarioFacturacion()
       : esAvisoSucursal
@@ -878,6 +889,7 @@ async function enviarMailArrepentimiento(id, mostrarResultado = true, modo = 'ma
       estado_cliente: esAvisoAutomaticoCaja ? 'Pendiente de Caja' : 'Notificado',
       check_envio: true,
       estado: estadoLuegoDelEnvio,
+      template_id: plantillaLuegoDelEnvio,
       emails_destino: destinatarioLuegoDelEnvio
     }).eq('id', id);
     if (updateError) throw updateError;
@@ -886,6 +898,7 @@ async function enviarMailArrepentimiento(id, mostrarResultado = true, modo = 'ma
     item.estado_cliente = esAvisoAutomaticoCaja ? 'Pendiente de Caja' : 'Notificado';
     item.check_envio = true;
     item.estado = estadoLuegoDelEnvio;
+    item.template_id = plantillaLuegoDelEnvio;
     item.emails_destino = destinatarioLuegoDelEnvio;
 
     if (mostrarResultado) {
@@ -999,7 +1012,7 @@ async function guardarNuevoArrepentimiento(event) {
   const estado = document.getElementById('arrEstadoPedido')?.value || 'Otros';
   const sucursalSelect = document.getElementById('arrSucursal');
   const sucursal = sucursalSelect?.value || '';
-  const template_id = document.getElementById('arrTemplateId')?.value || '';
+  const template_id = obtenerPlantillaConfiguradaArrepentimiento(estado)?.id || '';
   const comentario = arrepentimientoTextoSeguro(document.getElementById('arrComentario')?.value, 500);
 
   if (!cliente_nombre || !cliente_email || !pedidoVal) {
