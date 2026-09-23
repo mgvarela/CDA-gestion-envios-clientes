@@ -81,8 +81,10 @@ create table if not exists public.arrepentimientos (
   numero_pedido text,
   pedido text,
   canal text,
+  monto_devolver numeric,
   motivo text,
   otro text,
+  sucursal text,
   template_id text,
   comentario text,
   estado text not null default 'pendiente',
@@ -106,7 +108,9 @@ alter table public.arrepentimientos add column if not exists pedido_id text;
 alter table public.arrepentimientos add column if not exists numero_pedido text;
 alter table public.arrepentimientos add column if not exists pedido text;
 alter table public.arrepentimientos add column if not exists canal text;
+alter table public.arrepentimientos add column if not exists monto_devolver numeric;
 alter table public.arrepentimientos add column if not exists otro text;
+alter table public.arrepentimientos add column if not exists sucursal text;
 alter table public.arrepentimientos add column if not exists template_id text;
 alter table public.arrepentimientos add column if not exists comentario text;
 alter table public.arrepentimientos add column if not exists fecha_envio timestamptz;
@@ -122,8 +126,17 @@ create table if not exists public.templates (
   id text primary key,
   nombre text not null,
   cuerpo text not null,
+  es_contenido_app boolean not null default true,
+  modulo text not null default 'todos',
+  estado text,
+  activo boolean not null default true,
   created_at timestamptz default now()
 );
+
+alter table public.templates add column if not exists modulo text not null default 'todos';
+alter table public.templates add column if not exists estado text;
+alter table public.templates add column if not exists es_contenido_app boolean not null default true;
+alter table public.templates add column if not exists activo boolean not null default true;
 
 -- La funcion evita consultar profiles desde una policy de profiles y caer en recursion.
 create or replace function public.current_user_role()
@@ -336,6 +349,7 @@ create table if not exists public.arrepentimientos (
   numero_pedido text,
   pedido text,
   canal text,
+  monto_devolver numeric,
   motivo text,
   otro text,
   template_id text,
@@ -353,6 +367,7 @@ alter table public.arrepentimientos add column if not exists estado_cliente text
 alter table public.arrepentimientos add column if not exists emails_destino text;
 alter table public.arrepentimientos add column if not exists check_envio boolean default false;
 alter table public.arrepentimientos add column if not exists canal text;
+alter table public.arrepentimientos add column if not exists monto_devolver numeric;
 alter table public.arrepentimientos add column if not exists otro text;
 alter table public.arrepentimientos add column if not exists template_id text;
 alter table public.arrepentimientos add column if not exists comentario text;
@@ -378,5 +393,43 @@ for select to authenticated using (public.current_user_role() = 'admin');
 drop policy if exists arrepentimientos_logs_insert_authenticated on public.arrepentimientos_logs;
 create policy arrepentimientos_logs_insert_authenticated on public.arrepentimientos_logs
 for insert to authenticated with check (true);
+
+-- 3. Tabla de Configuraciones del Sistema y Credenciales Sensibles (Solo Admin)
+create table if not exists public.configuraciones_sistema (
+  clave text primary key,
+  valor text not null,
+  descripcion text,
+  es_secreta boolean default true,
+  updated_at timestamptz default now()
+);
+
+alter table public.configuraciones_sistema enable row level security;
+
+-- Políticas RLS: Exclusivas para el rol 'admin'
+drop policy if exists configuraciones_select_admin on public.configuraciones_sistema;
+create policy configuraciones_select_admin on public.configuraciones_sistema
+for select to authenticated using (public.current_user_role() = 'admin');
+
+drop policy if exists configuraciones_insert_admin on public.configuraciones_sistema;
+create policy configuraciones_insert_admin on public.configuraciones_sistema
+for insert to authenticated with check (public.current_user_role() = 'admin');
+
+drop policy if exists configuraciones_update_admin on public.configuraciones_sistema;
+create policy configuraciones_update_admin on public.configuraciones_sistema
+for update to authenticated using (public.current_user_role() = 'admin') with check (public.current_user_role() = 'admin');
+
+drop policy if exists configuraciones_delete_admin on public.configuraciones_sistema;
+create policy configuraciones_delete_admin on public.configuraciones_sistema
+for delete to authenticated using (public.current_user_role() = 'admin');
+
+-- Valores iniciales del sistema (no sobreescribe valores si ya existen)
+insert into public.configuraciones_sistema (clave, valor, descripcion, es_secreta) values
+  ('DISPATCHTRACK_API_KEY', '', 'API Key de DispatchTrack para seguimiento logístico', true),
+  ('EPRESIS_API_KEY', '', 'API Key de Epresis para seguimiento', true),
+  ('MERCADO_FLEX_TOKEN', '', 'Token de autorización OAuth de Mercado Envíos Flex', true),
+  ('DESTINATARIO_FACTURACION', 'mvarela@casadelaudio.com', 'Email destinatario para avisos de facturación y caja', false),
+  ('EMAIL_ADMIN_GRUPO', 'info---ecommerce@googlegroups.com', 'Email grupal para alertas de cambios operativos y promociones', false),
+  ('GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbyOHK_tiJJgVY9HffudGWQuyfCIIld70VpFg7d4EonvYe2dbOm30p8CAqm9rczkQv9R/exec', 'Webhook URL de Google Apps Script para archivado de arrepentimientos', true)
+on conflict (clave) do nothing;
 
 notify pgrst, 'reload schema';

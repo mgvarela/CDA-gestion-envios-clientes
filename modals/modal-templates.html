@@ -7,19 +7,62 @@
       </div>
       <div class="modal-body">
         <form id="formTemplate" class="mb-4">
-          <h6>Nueva Plantilla</h6>
+          <h6>Generador de plantillas</h6>
+          <p class="small text-muted mb-2">
+            El diseño base se mantiene en EmailJS. Acá podés crear y editar el asunto y el texto que recibirá el cliente.
+          </p>
           <div class="row g-2 mb-2">
             <div class="col-md-4">
-              <input type="text" id="tplId" class="form-control" placeholder="ID (ej: tpl_envio)" required>
+              <input type="text" id="tplId" class="form-control" placeholder="Identificador interno (ej: arrepentimiento_cliente)" required>
             </div>
             <div class="col-md-8">
               <input type="text" id="tplNombre" class="form-control" placeholder="Asunto del mail" required>
             </div>
           </div>
-          <div class="mb-2">
-            <textarea id="tplCuerpo" class="form-control" rows="3" placeholder="Cuerpo del correo con {{nombre}} y {{pedido}}" required></textarea>
+          <div class="row g-2 mb-2">
+            <div class="col-md-8">
+              <select id="tplModulo" class="form-select" required>
+                <option value="todos">Todos los módulos</option>
+                <option value="arrepentimiento">Arrepentimiento</option>
+                <option value="envios">Envíos</option>
+                <option value="pedidos">Pedidos de mercadería</option>
+              </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-center">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="tplActivo" checked>
+                <label class="form-check-label" for="tplActivo">Activa</label>
+              </div>
+            </div>
           </div>
-          <button type="button" class="btn btn-sm btn-dark" onclick="guardarTemplate()">Guardar Plantilla</button>
+          <div class="mb-2">
+            <select id="tplEstado" class="form-select">
+              <option value="">Template general del módulo</option>
+              <option value="Devuelve Sucursal">Devuelve Sucursal</option>
+              <option value="Avisar a Sucursal">Avisar a Sucursal</option>
+              <option value="Pendiente de Caja">Pendiente de Caja</option>
+              <option value="Notificado">Notificado</option>
+              <option value="Retiro en domicilio">Retiro en domicilio</option>
+              <option value="Pre Cerrado">Pre Cerrado</option>
+              <option value="Cerrado">Cerrado</option>
+              <option value="Cerrado sin gestion">Cerrado sin gestión</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <textarea id="tplCuerpo" class="form-control" rows="6" placeholder="Texto plano con variables como {{cliente_nombre}} y {{numero_orden}}" oninput="actualizarVistaPreviaTemplate()" required></textarea>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-dark" id="btnGuardarTemplate" onclick="guardarTemplate()">Guardar plantilla</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="btnCancelarEdicionTemplate" onclick="cancelarEdicionTemplate()">Cancelar edición</button>
+          </div>
+          <div class="small text-muted mt-2">
+            Variables: {{cliente_nombre}}, {{cliente_dni}}, {{cliente_telefono}}, {{cliente_email}}, {{numero_orden}}, {{motivo}}, {{otro}}, {{comentario}}, {{monto_devolver}}, {{canal}}, {{estado}}, {{sucursal}}<br>
+            Ejemplo: Hola {{cliente_nombre}}, para devolver la orden {{numero_orden}}, acercá el producto a la {{sucursal}}.
+          </div>
+          <div class="border rounded p-2 mt-2 bg-light">
+            <strong class="small">Vista previa</strong>
+            <pre id="tplVistaPrevia" class="small mb-0 mt-1" style="white-space: pre-wrap;">Escribí un texto para ver la vista previa.</pre>
+          </div>
         </form>
         <h6>Plantillas Registradas</h6>
         <ul class="list-group" id="listTemplates"></ul>

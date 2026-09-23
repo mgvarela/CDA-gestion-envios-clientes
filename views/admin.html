@@ -48,6 +48,11 @@
       <i class="bi bi-shield-lock"></i> Usuarios / Permisos
     </button>
   </li>
+  <li class="nav-item" data-admin-only="true">
+    <button class="nav-link w-100" id="tab-configuracion" type="button" onclick="window.mostrarPanelConfiguracion()">
+      <i class="bi bi-gear-wide-connected"></i> Configuración / APIs
+    </button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -156,6 +161,38 @@
             </tr>
           </thead>
           <tbody id="tblUsuariosPermisos"><tr><td colspan="6" class="text-center py-3">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. CONFIGURACIÓN DEL SISTEMA Y APIS -->
+  <div class="tab-pane fade" id="content-configuracion">
+    <div class="card p-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h5 class="mb-1"><i class="bi bi-shield-lock-fill text-primary me-1"></i> Parámetros del Sistema y Credenciales de APIs</h5>
+          <p class="text-muted small mb-0">Configuración protegida por RLS. Solo usuarios con rol <strong>admin</strong> pueden ver o editar estos valores.</p>
+        </div>
+        <div>
+          <button class="btn btn-outline-primary btn-sm me-2" onclick="cargarConfiguracionesSistema()"><i class="bi bi-arrow-clockwise"></i> Recargar</button>
+          <button class="btn btn-primary btn-sm" onclick="guardarTodasConfiguracionesSistema()"><i class="bi bi-check2-all"></i> Guardar Todo</button>
+        </div>
+      </div>
+      
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 250px;">Variable / API</th>
+              <th>Descripción</th>
+              <th style="width: 380px;">Valor / Token</th>
+              <th style="width: 100px;" class="text-end">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tblConfiguracionesSistema">
+            <tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando configuraciones...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>

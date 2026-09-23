@@ -3,10 +3,13 @@
   <div>
     <p class="view-kicker mb-1">Operaciones / Postventa</p>
     <h2 class="mb-1"><i class="bi bi-arrow-counterclockwise"></i> Solicitudes de arrepentimiento</h2>
-    <p class="view-subtitle mb-0">Revisá, actualizá y notificá solicitudes pendientes.</p>
+    <p class="view-subtitle mb-0">Gestioná solicitudes, devoluciones y derivaciones a Caja.</p>
   </div>
   <div class="view-actions d-flex flex-wrap gap-2">
-    <label class="btn btn-primary btn-sm mb-0" for="archivoArrepentimientos" data-role-action="write">
+    <button class="btn btn-primary btn-sm mb-0" type="button" onclick="abrirModalNuevoArrepentimiento()" data-role-action="write" id="btnNuevoArrepentimiento">
+      <i class="bi bi-plus-circle"></i> Nuevo Ingreso
+    </button>
+    <label class="btn btn-outline-primary btn-sm mb-0" for="archivoArrepentimientos" data-role-action="write">
       <i class="bi bi-file-earmark-arrow-up"></i> Importar CSV
     </label>
     <button class="btn btn-outline-secondary btn-sm" onclick="exportarSeleccionadosArrepentimientosCSV()">
@@ -24,6 +27,15 @@
     </button>
   </div>
 </div>
+<nav class="view-subnav mb-3" aria-label="Secciones de arrepentimientos">
+  <button type="button" class="view-subnav-link active" id="subnavArrepentimientosTodas" onclick="cambiarVistaArrepentimientos('todas')">
+    <i class="bi bi-list-ul"></i> Todas las solicitudes
+  </button>
+  <button type="button" class="view-subnav-link" id="subnavArrepentimientosCaja" onclick="cambiarVistaArrepentimientos('caja')">
+    <i class="bi bi-inbox"></i> Enviado a Caja
+    <span class="subnav-count" id="contadorArrepentimientosCaja">0</span>
+  </button>
+</nav>
 <!-- BARRA DE FILTROS -->
 <div class="filter-panel mb-3">
   <div class="filter-heading"><i class="bi bi-funnel"></i><span>Filtrar solicitudes</span></div>
@@ -35,8 +47,13 @@
       <select id="filtroEstadoArrepentimiento" class="form-select form-select-sm" onchange="filtrarArrepentimientos()">
         <option value="">Todos los Estados</option>
         <option value="Devuelve Sucursal">Devuelve Sucursal</option>
+        <option value="Avisar a Sucursal">Avisar a Sucursal</option>
+        <option value="Notificado">Notificado</option>
         <option value="Retiro en domicilio">Retiro en domicilio</option>
         <option value="Enviado a Caja">Enviado a Caja</option>
+        <option value="Pre Cerrado">Pre Cerrado</option>
+        <option value="Cerrado sin gestion">Cerrado sin gestion</option>
+        <option value="Cerrado">Cerrado</option>
         <option value="Otros">Otros</option>
       </select>
     </div>
@@ -48,7 +65,7 @@
       </select>
     </div>
     <div class="col-md-1 text-md-end">
-      <span class="badge bg-light text-dark border" id="resumenArrepentimientos">0 registros</span>
+      <span class="badge btn btn-dark  border" id="resumenArrepentimientos">0 registros</span>
     </div>
   </div>
 </div>
@@ -63,18 +80,24 @@
   <select class="form-select form-select-sm bulk-action-control" id="bulkEstadoArrepentimiento">
     <option value="">Cambiar estado...</option>
     <option value="Devuelve Sucursal">Devuelve Sucursal</option>
+    <option value="Avisar a Sucursal">Avisar a Sucursal</option>
+    <option value="Notificado">Notificado</option>
     <option value="Retiro en domicilio">Retiro en domicilio</option>
     <option value="Enviado a Caja">Enviado a Caja</option>
+    <option value="Pre Cerrado">Pre Cerrado</option>
+    <option value="Cerrado">Cerrado</option>
+    <option value="Cerrado sin gestion">Cerrado sin gestion</option>
     <option value="Otros">Otros</option>
   </select>
   <select class="form-select form-select-sm bulk-action-control" id="bulkCanalArrepentimiento">
     <option value="">Cambiar canal...</option>
     <option value="web">Web</option>
     <option value="mercado libre">Mercado Libre</option>
-    <option value="tienda icbc">Tienda ICBC</option>
-    <option value="provincia">Provincia</option>
+    <option value="produteca">Produteca</option>
+    <option value="sucursales">Sucursales</option>
   </select>
   <button class="btn btn-primary btn-sm" type="button" onclick="aplicarCambiosMasivosArrepentimientos()" data-role-action="write"><i class="bi bi-check2"></i> Aplicar cambios</button>
+  <button class="btn btn-outline-primary btn-sm" type="button" onclick="enviarArrepentimientosSeleccionados()" data-role-action="write"><i class="bi bi-send"></i> Enviar mails</button>
   <button class="btn btn-link btn-sm bulk-delete-action" type="button" onclick="eliminarArrepentimientosSeleccionados()" data-role-action="delete"><i class="bi bi-trash3"></i> Eliminar</button>
 </div>
 
@@ -85,22 +108,24 @@
       <thead class="table-light">
         <tr>
           <th width="40">Seleccionar</th>
-          <th>Cliente / DNI / Tel</th>
+          <th>Cliente / DNI / Tel / Email</th>
           <th>Pedido</th>
           <th class="col-motivo">Motivo</th>
           <th class="col-otro">Otro</th>
-          <th>Comentarios (Interno)</th>
+          <th>Comentario / Factura</th>
+          <th class="col-monto">Monto a devolver</th>
           <th class="col-canal">Canal</th>
           <th>Plantilla</th>
           <th>Estado Pedido</th>
-          <th>Destinatarios Email</th>
+          <th>Sucursal</th>
+          <th>Destinatario</th>
           <th>Estado</th>
           <th>Fecha Envío</th>
           <th class="text-end">Acciones</th>
         </tr>
       </thead>
       <tbody id="tblArrepentimientos">
-        <tr><td colspan="13" class="text-center py-4">Cargando solicitudes...</td></tr>
+        <tr><td colspan="15" class="text-center py-4">Cargando solicitudes...</td></tr>
       </tbody>
     </table>
   </div>
@@ -131,6 +156,155 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE CARGA MANUAL DE SOLICITUD DE ARREPENTIMIENTO -->
+<div class="modal fade" id="modalNuevoArrepentimiento" tabindex="-1" aria-labelledby="modalNuevoArrepentimientoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fs-6 fw-bold" id="modalNuevoArrepentimientoLabel">
+          <i class="bi bi-plus-circle text-primary me-2"></i>Nueva Solicitud de Arrepentimiento
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="formNuevoArrepentimiento" onsubmit="guardarNuevoArrepentimiento(event)">
+        <div class="modal-body py-3">
+          <div class="row g-3">
+            <!-- Sección 1: Datos del Cliente -->
+            <div class="col-12">
+              <span class="badge btn btn-dark  border"><i class="bi bi-person me-1"></i> Datos del Cliente</span>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Nombre y Apellido *</label>
+              <input type="text" class="form-control form-control-sm" id="arrClienteNombre" required placeholder="Ej. Juan Pérez">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Email *</label>
+              <input type="email" class="form-control form-control-sm" id="arrClienteEmail" required placeholder="juan@ejemplo.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">DNI / Documento</label>
+              <input type="text" class="form-control form-control-sm" id="arrClienteDni" placeholder="Ej. 30123456">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Teléfono</label>
+              <input type="text" class="form-control form-control-sm" id="arrClienteTelefono" placeholder="Ej. 1123456789">
+            </div>
+
+            <!-- Sección 2: Datos de la Orden / Pedido -->
+            <div class="col-12 mt-3">
+              <span class="badge btn btn-dark  border"><i class="bi bi-box-seam me-1"></i> Datos del Pedido</span>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">N° de Pedido / Orden *</label>
+              <input type="text" class="form-control form-control-sm" id="arrPedidoId" required placeholder="Ej. 10023456">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Canal</label>
+              <select class="form-select form-select-sm" id="arrCanal">
+                <option value="">Seleccionar canal...</option>
+                <option value="web" selected>Web</option>
+                <option value="mercado libre">Mercado Libre</option>
+                <option value="produteca">Produteca</option>
+                <option value="sucursales">Sucursales</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Monto a Devolver ($)</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="arrMontoDevolver" placeholder="0.00">
+            </div>
+
+            <!-- Sección 3: Motivo y Gestión -->
+            <div class="col-12 mt-3">
+              <span class="badge btn btn-dark  border"><i class="bi bi-arrow-repeat me-1"></i> Motivo y Estado</span>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Motivo</label>
+              <select class="form-select form-select-sm" id="arrMotivo">
+                <option value="Arrepentimiento de compra" selected>Arrepentimiento de compra</option>
+                <option value="Error en la compra">Error en la compra</option>                 
+                <option value="No era lo que esperaba" >No era lo que esperaba</option>
+                <option value="La entrega se demoro" >La entrega se demoró</option>
+                <option value="Producto defectuoso o fallado" >Producto defectuoso o fallado</option>
+                <option value="Producto distinto al solicitado" >Producto distinto al solicitado</option>
+                <option value="Encontre una mejor oferta" >Encontré una mejor oferta</option>
+                <option value="Prefiero no informar el motivo" >Prefiero no informar el motivo</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Detalle "Otro"</label>
+              <input type="text" class="form-control form-control-sm" id="arrOtro" placeholder="Detalle adicional si aplica...">
+            </div>
+            <!-- NUEVO: Selector de Estado del Pedido -->
+            <div class="col-md-6 mt-3">
+              <label class="form-label small fw-semibold text-primary">Estado del Pedido *</label>
+              <select class="form-select form-select-sm border-primary" id="arrEstadoPedido" required>
+                <option value="" disabled selected>Seleccionar acción...</option>
+                <option value="Retiro en domicilio">Retiro en domicilio</option>
+                <option value="Devuelve Sucursal">Devuelve en Sucursal</option>
+                <option value="Avisar a Sucursal">Avisar a Sucursal</option>
+                <option value="Notificado">Notificado</option>
+                <option value="Enviado a Caja">Enviado a Caja</option>
+                <option value="Cerrado sin gestion">Cerrado sin gestión</option>
+                <option value="Cerrado">Cerrado</option>
+              </select>
+              <div id="arrAvisoCajaModal" class="form-text small text-primary mt-1 d-none">
+                <i class="bi bi-info-circle-fill"></i> Se notificará a Facturación al guardar.
+              </div>
+            </div>
+
+            <!-- NUEVO: Selector de Sucursales (Oculto por defecto con d-none) -->
+            <div class="col-md-6 mt-3 d-none" id="contenedorSucursal">
+              <label class="form-label small fw-semibold">Sucursal de Devolución *</label>
+              <select class="form-select form-select-sm" id="arrSucursal">
+                <option value="" disabled selected>Elegir tienda...</option>
+                 <option value="mvarela@casadelaudio.com">Tienda Prueba</option>
+                <option value="ruta8@lacasadelaudio.com">Tienda Ruta 8 (San Martín)</option>
+                <option value="sanmartin@lacasadelaudio.com">Tienda San Martín</option>
+                <option value="rmejia@lacasadelaudio.com">Tienda Ramos Mejía</option>
+                <option value="flores@lacasadelaudio.com">Tienda Flores</option>
+                <option value="caballito@casadelaudio.com">Tienda Caballito</option>
+                <option value="parque@lacasadelaudio.com">Tienda Parque Avellaneda</option>
+                <option value="moron@lacasadelaudio.com">Tienda Morón</option>
+                <option value="abasto@lacasadelaudio.com">Tienda Almagro / Abasto</option>
+                <option value="sanjusto@lacasadelaudio.com">Tienda San Justo</option>
+                <option value="ituzaingo@lacasadelaudio.com">Tienda Ituzaingó</option>
+                <option value="leloir@casadelaudio.com">Megastore Leloir</option>
+                <option value="sanfernando@casadelaudio.com">Tienda San Fernando</option>
+                <option value="sanmiguel@lacasadelaudio.com">Tienda San Miguel</option>
+                <option value="laferrere@casadelaudio.com">Tienda Laferrere</option>
+                <option value="merlo@lacasadelaudio.com">Tienda Merlo</option>
+                <option value="jose-paz-sin-email">Tienda José C. Paz (sin email)</option>
+                <option value="lomas@lacasadelaudio.com">Tienda Lomas de Zamora</option>
+                <option value="moreno2@lacasadelaudio.com">Tienda Moreno II</option>
+                <option value="moreno3@lacasadelaudio.com">Tienda Moreno III</option>
+                <option value="monte-grande-sin-email">Tienda Monte Grande (sin email)</option>
+                <option value="canning@casadelaudio.com">Tienda Canning</option>
+                <option value="quilmes@casadelaudio.com">Tienda Quilmes</option>
+                <option value="solano@casadelaudio.com">Tienda Solano</option>
+                <option value="pilar@casadelaudio.com">Megastore Pilar</option>
+                <option value="berazategui@casadelaudio.com">Tienda Berazategui</option>
+              </select>
+            </div>
+
+            <!-- Sección 4: Comentarios Internos -->
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Comentarios Internos</label>
+              <textarea class="form-control form-control-sm" id="arrComentario" rows="2" placeholder="Observaciones internas del caso..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-primary" id="btnGuardarNuevoArrepentimiento">
+            <i class="bi bi-check2"></i> Guardar Solicitud
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

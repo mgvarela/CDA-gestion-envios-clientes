@@ -37,7 +37,24 @@ function mostrarPanelUsuarios() {
   cargarUsuariosRoles();
 }
 
+function mostrarPanelConfiguracion() {
+  document.querySelectorAll('#adminTabs .nav-link').forEach(link => link.classList.remove('active'));
+  document.querySelectorAll('.tab-content .tab-pane').forEach(panel => panel.classList.remove('show', 'active'));
+
+  const tab = document.getElementById('tab-configuracion');
+  const panel = document.getElementById('content-configuracion');
+  if (!tab || !panel) return;
+
+  tab.classList.add('active');
+  panel.classList.add('show', 'active');
+  cargarConfiguracionesSistema();
+}
+
 window.mostrarPanelUsuarios = mostrarPanelUsuarios;
+window.mostrarPanelConfiguracion = mostrarPanelConfiguracion;
+window.abrirModalPlantillas = abrirModalPlantillas;
+window.actualizarEstadoTemplate = actualizarEstadoTemplate;
+window.actualizarVistaPreviaTemplate = actualizarVistaPreviaTemplate;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -50,6 +67,15 @@ function escapeHtml(value) {
 
 function sanitizeText(value, maxLength = 200) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function sanitizeTemplateBody(value, maxLength = 2000) {
+  return String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, maxLength);
 }
 
 function sanitizeEmail(value) {
@@ -197,7 +223,7 @@ function renderTemplates() {
 
     const meta = document.createElement('small');
     meta.className = 'text-muted';
-    meta.textContent = ` (${sanitizeText(t.id, 50)})`;
+    meta.textContent = ` (${sanitizeText(t.id, 50)}) - ${sanitizeText(t.modulo || 'todos', 40)} - ${sanitizeText(t.estado || 'general', 50)}`;
     item.appendChild(meta);
 
     const br = document.createElement('br');
@@ -207,15 +233,104 @@ function renderTemplates() {
     body.textContent = sanitizeText(t.cuerpo, 500) || '-';
     item.appendChild(body);
 
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'btn btn-sm btn-outline-primary mt-2 me-2';
+    editButton.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+    editButton.addEventListener('click', () => editarTemplate(t.id));
+    item.appendChild(editButton);
+
+    const active = document.createElement('div');
+    active.className = 'form-check form-switch mt-2';
+    const activeInput = document.createElement('input');
+    activeInput.type = 'checkbox';
+    activeInput.className = 'form-check-input';
+    activeInput.checked = t.activo !== false;
+    activeInput.id = `template-active-${sanitizeTemplateId(t.id)}`;
+    activeInput.addEventListener('change', () => actualizarEstadoTemplate(t.id, activeInput.checked));
+    const activeLabel = document.createElement('label');
+    activeLabel.className = 'form-check-label';
+    activeLabel.htmlFor = activeInput.id;
+    activeLabel.textContent = 'Disponible para seleccionar';
+    active.appendChild(activeInput);
+    active.appendChild(activeLabel);
+    item.appendChild(active);
+
+    if (canDelete()) {
+      const actions = document.createElement('div');
+      actions.className = 'mt-2';
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'btn btn-sm btn-outline-danger';
+      deleteButton.innerHTML = '<i class="bi bi-trash3"></i> Eliminar referencia';
+      deleteButton.addEventListener('click', () => eliminarTemplate(t.id));
+      actions.appendChild(deleteButton);
+      item.appendChild(actions);
+    }
+
     list.appendChild(item);
   });
+}
+
+async function abrirModalPlantillas() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  const modalEl = document.getElementById('modalTemplates');
+  if (!modalEl) return mostrarNotificacion('No se pudo cargar el panel de plantillas.', 'danger');
+
+  const { data, error } = await supabaseClient.from('templates').select('*').order('nombre');
+  if (error) return mostrarNotificacion('No se pudieron cargar las plantillas: ' + error.message, 'danger');
+  templatesData = data || [];
+  renderTemplates();
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+async function actualizarEstadoTemplate(id, activo) {
+  if (!(await requireAuth()) || !canWrite()) return;
+  const { error } = await supabaseClient.from('templates').update({ activo }).eq('id', id);
+  if (error) return mostrarNotificacion('No se pudo actualizar la plantilla: ' + error.message, 'danger');
+  const template = templatesData.find(item => String(item.id) === String(id));
+  if (template) template.activo = activo;
+  if (typeof cargarPlantillasEmail === 'function') await cargarPlantillasEmail();
+  mostrarNotificacion(activo ? 'Plantilla activada.' : 'Plantilla desactivada.', 'success');
+}
+
+function editarTemplate(id) {
+  const template = templatesData.find(item => String(item.id) === String(id));
+  if (!template) return;
+  document.getElementById('tplId').value = template.id || '';
+  document.getElementById('tplId').readOnly = true;
+  document.getElementById('tplNombre').value = template.nombre || '';
+  document.getElementById('tplCuerpo').value = template.cuerpo || '';
+  document.getElementById('tplModulo').value = template.modulo || 'todos';
+  document.getElementById('tplEstado').value = template.estado || '';
+  document.getElementById('tplActivo').checked = template.activo !== false;
+  document.getElementById('btnGuardarTemplate').textContent = 'Guardar cambios';
+  document.getElementById('btnCancelarEdicionTemplate').classList.remove('d-none');
+  actualizarVistaPreviaTemplate();
+}
+
+function cancelarEdicionTemplate() {
+  const form = document.getElementById('formTemplate');
+  form?.reset();
+  document.getElementById('tplId').readOnly = false;
+  document.getElementById('tplActivo').checked = true;
+  document.getElementById('btnGuardarTemplate').textContent = 'Guardar plantilla';
+  document.getElementById('btnCancelarEdicionTemplate').classList.add('d-none');
+  actualizarVistaPreviaTemplate();
+}
+
+function actualizarVistaPreviaTemplate() {
+  const preview = document.getElementById('tplVistaPrevia');
+  const cuerpo = document.getElementById('tplCuerpo')?.value || '';
+  if (preview) preview.textContent = cuerpo || 'Escribí un texto para ver la vista previa.';
 }
 
 async function asignarPlantilla(clienteId, templateId) {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para asignar plantillas.');
+    mostrarNotificacion('No tenés permisos para asignar plantillas.', 'danger');
     return;
   }
 
@@ -223,19 +338,19 @@ async function asignarPlantilla(clienteId, templateId) {
   if (cliente) cliente.template_id = templateId;
 
   const { error } = await supabaseClient.from('clientes').update({ template_id: templateId }).eq('id', clienteId);
-  if (error) alert("Error al asignar plantilla: " + error.message);
+  if (error) mostrarNotificacion("Error al asignar plantilla: " + error.message, 'danger');
 }
 
 async function enviarMail(clienteId) {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para enviar mails.');
+    mostrarNotificacion('No tenés permisos para enviar mails.', 'danger');
     return;
   }
 
   const cliente = clientesData.find(c => String(c.id) === String(clienteId));
-  if (!cliente || !cliente.template_id) return alert("Por favor, selecciona una plantilla.");
+  if (!cliente || !cliente.template_id) return mostrarNotificacion("Por favor, seleccioná una plantilla.", 'warning');
 
   const template = templatesData.find(t => String(t.id) === String(cliente.template_id));
   if (!template) return;
@@ -255,10 +370,10 @@ async function enviarMail(clienteId) {
     await emailjs.send(EMAILJS_SERVICE_ID, template.id, params);
     await supabaseClient.from('clientes').update({ estado: 'enviado', fecha_envio: new Date() }).eq('id', clienteId);
     
-    alert(`📧 Mail enviado con éxito a ${emailDestino}`);
+    mostrarNotificacion(`📧 Mail enviado con éxito a ${emailDestino}`, 'success');
     cargarDatosEnvios();
   } catch (err) {
-    alert("❌ Error al enviar mail: " + JSON.stringify(err));
+    mostrarNotificacion("❌ Error al enviar mail: " + (err.text || err.message || JSON.stringify(err)), 'danger');
     await supabaseClient.from('clientes').update({ estado: 'error' }).eq('id', clienteId);
     cargarDatosEnvios();
   } finally {
@@ -270,7 +385,7 @@ async function guardarCliente() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para crear clientes.');
+    mostrarNotificacion('No tenés permisos para crear clientes.', 'danger');
     return;
   }
 
@@ -278,13 +393,14 @@ async function guardarCliente() {
   const pedido = sanitizeText(document.getElementById('newPedido').value, 200);
   const mail = sanitizeEmail(document.getElementById('newMail').value);
 
-  if (!nombre || !mail || !isValidEmail(mail)) return alert('Nombre y correo válido son requeridos.');
+  if (!nombre || !mail || !isValidEmail(mail)) return mostrarNotificacion('Nombre y correo válido son requeridos.', 'warning');
 
   const { error } = await supabaseClient.from('clientes').insert([{ nombre, pedido, mail, estado: 'sin aviso' }]);
-  if (error) alert("Error al guardar: " + error.message);
+  if (error) mostrarNotificacion("Error al guardar: " + error.message, 'danger');
   else {
     bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
     document.getElementById('formCliente').reset();
+    mostrarNotificacion('Cliente creado correctamente.', 'success');
     cargarDatosEnvios();
   }
 }
@@ -293,21 +409,33 @@ async function guardarTemplate() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para guardar plantillas.');
+    mostrarNotificacion('No tenés permisos para guardar plantillas.', 'danger');
     return;
   }
 
   const id = sanitizeTemplateId(document.getElementById('tplId').value);
   const nombre = sanitizeText(document.getElementById('tplNombre').value, 150);
-  const cuerpo = sanitizeText(document.getElementById('tplCuerpo').value, 2000);
+  const cuerpo = sanitizeTemplateBody(document.getElementById('tplCuerpo').value, 2000);
 
-  if (!id || !nombre || !cuerpo) return alert('Todos los campos son obligatorios.');
+  if (!id || !nombre || !cuerpo) return mostrarNotificacion('Todos los campos son obligatorios.', 'warning');
 
-  const { error } = await supabaseClient.from('templates').insert([{ id, nombre, cuerpo }]);
-  if (error) alert("Error al guardar plantilla: " + error.message);
+  const modulo = document.getElementById('tplModulo')?.value || 'todos';
+  const estado = document.getElementById('tplEstado')?.value || null;
+  const activo = document.getElementById('tplActivo')?.checked !== false;
+  const editando = document.getElementById('tplId').readOnly;
+  const payload = { nombre, cuerpo, modulo, estado, activo, es_contenido_app: true };
+  const query = editando
+    ? supabaseClient.from('templates').update(payload).eq('id', id)
+    : supabaseClient.from('templates').insert([{ id, ...payload }]);
+  const { error } = await query;
+  if (error) mostrarNotificacion("Error al guardar plantilla: " + error.message, 'danger');
   else {
-    document.getElementById('formTemplate').reset();
-    cargarDatosEnvios();
+    cancelarEdicionTemplate();
+    mostrarNotificacion('Plantilla guardada correctamente.', 'success');
+    const { data } = await supabaseClient.from('templates').select('*').order('nombre');
+    templatesData = data || [];
+    renderTemplates();
+    if (typeof cargarPlantillasEmail === 'function') await cargarPlantillasEmail();
   }
 }
 
@@ -315,12 +443,14 @@ async function eliminarCliente(id) {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canDelete()) {
-    alert('Solo un admin puede eliminar clientes.');
+    mostrarNotificacion('Solo un admin puede eliminar clientes.', 'danger');
     return;
   }
 
-  if (confirm("¿Estás seguro de eliminar este registro?")) {
+  const confirmar = await confirmarAccionModal('Eliminar cliente', '¿Estás seguro de eliminar este registro?');
+  if (confirmar) {
     await supabaseClient.from('clientes').delete().eq('id', id);
+    mostrarNotificacion('Cliente eliminado correctamente.', 'success');
     cargarDatosEnvios();
   }
 }
@@ -356,12 +486,13 @@ async function actualizarSeleccionAdmin(tipo) {
   const configuracion = configuracionSeleccionAdmin(tipo);
   const ids = Array.from(document.querySelectorAll(`${configuracion.selector}:checked`)).map(input => input.value);
   const valor = document.getElementById(configuracion.control)?.value || '';
-  if (!ids.length) return alert('Seleccioná al menos un registro.');
-  if (!valor) return alert('Elegí un estado para aplicar.');
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos un registro.', 'warning');
+  if (!valor) return mostrarNotificacion('Elegí un estado para aplicar.', 'warning');
 
   const { error } = await supabaseClient.from(configuracion.tabla).update({ [configuracion.campo]: valor }).in('id', ids);
-  if (error) return alert('No se pudieron aplicar los cambios: ' + error.message);
+  if (error) return mostrarNotificacion('No se pudieron aplicar los cambios: ' + error.message, 'danger');
   document.getElementById(configuracion.control).value = '';
+  mostrarNotificacion('Cambios aplicados correctamente.', 'success');
   await configuracion.cargar();
 }
 
@@ -371,11 +502,14 @@ async function eliminarSeleccionAdmin(tipo) {
 
   const configuracion = configuracionSeleccionAdmin(tipo);
   const ids = Array.from(document.querySelectorAll(`${configuracion.selector}:checked`)).map(input => input.value);
-  if (!ids.length) return alert('Seleccioná al menos un registro.');
-  if (!confirm(`¿Eliminar los ${ids.length} registros seleccionados?`)) return;
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos un registro.', 'warning');
+
+  const confirmar = await confirmarAccionModal('Eliminar registros', `¿Eliminar los ${ids.length} registros seleccionados?`);
+  if (!confirmar) return;
 
   const { error } = await supabaseClient.from(configuracion.tabla).delete().in('id', ids);
-  if (error) return alert('No se pudieron eliminar los registros: ' + error.message);
+  if (error) return mostrarNotificacion('No se pudieron eliminar los registros: ' + error.message, 'danger');
+  mostrarNotificacion('Registros eliminados.', 'success');
   await configuracion.cargar();
 }
 
@@ -514,13 +648,16 @@ async function actualizarRolesSeleccionados() {
 
   const ids = Array.from(document.querySelectorAll('.usuario-checkbox:checked')).map(input => input.value);
   const rol = document.getElementById('bulkRolUsuarios')?.value || '';
-  if (!ids.length) return alert('Seleccioná al menos un usuario.');
-  if (!rol) return alert('Elegí un rol para aplicar.');
-  if (!confirm(`¿Asignar el rol ${rol} a ${ids.length} usuario(s)?`)) return;
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos un usuario.', 'warning');
+  if (!rol) return mostrarNotificacion('Elegí un rol para aplicar.', 'warning');
+
+  const confirmar = await confirmarAccionModal('Actualizar roles', `¿Asignar el rol "${rol}" a ${ids.length} usuario(s)?`);
+  if (!confirmar) return;
 
   const { error } = await supabaseClient.from('profiles').update({ role: rol }).in('id', ids);
-  if (error) return alert('No se pudieron actualizar los roles: ' + error.message);
+  if (error) return mostrarNotificacion('No se pudieron actualizar los roles: ' + error.message, 'danger');
   document.getElementById('bulkRolUsuarios').value = '';
+  mostrarNotificacion('Roles actualizados correctamente.', 'success');
   await cargarUsuariosRoles();
 }
 
@@ -528,7 +665,7 @@ async function guardarPermisoUsuario(userId) {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canDelete()) {
-    alert('Solo el admin principal puede modificar permisos.');
+    mostrarNotificacion('Solo el admin principal puede modificar permisos.', 'danger');
     return;
   }
 
@@ -539,7 +676,7 @@ async function guardarPermisoUsuario(userId) {
   const { error } = await supabaseClient.from('profiles').update({ role: nuevoRol }).eq('id', userId);
 
   if (error) {
-    alert('Error al actualizar el rol: ' + error.message);
+    mostrarNotificacion('Error al actualizar el rol: ' + error.message, 'danger');
     return;
   }
 
@@ -549,7 +686,7 @@ async function guardarPermisoUsuario(userId) {
     toggleAdminOnlySections();
   }
 
-  alert('Permiso actualizado correctamente.');
+  mostrarNotificacion('Permiso actualizado correctamente.', 'success');
   await cargarDatosAdmin();
 }
 
@@ -558,7 +695,7 @@ async function guardarNuevaPromoBancaria() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para crear promos bancarias.');
+    mostrarNotificacion('No tenés permisos para crear promos bancarias.', 'danger');
     return;
   }
 
@@ -574,9 +711,10 @@ async function guardarNuevaPromoBancaria() {
     id, banco, descuento, cuotas, vigencia_inicio, vigencia_fin, alcance, activa: 'SI', estado_vigencia: 'ACTIVA'
   }]);
 
-  if (error) alert("Error: " + error.message);
+  if (error) mostrarNotificacion("Error: " + error.message, 'danger');
   else {
     bootstrap.Modal.getInstance(document.getElementById('modalNuevaPromoBancaria')).hide();
+    mostrarNotificacion('Promo bancaria guardada correctamente.', 'success');
     cargarPromosBancarias();
   }
 }
@@ -585,7 +723,7 @@ async function guardarNuevaNovedad() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para crear novedades.');
+    mostrarNotificacion('No tenés permisos para crear novedades.', 'danger');
     return;
   }
 
@@ -595,9 +733,10 @@ async function guardarNuevaNovedad() {
 
   const { error } = await supabaseClient.from('admin_novedades').insert([{ id, categoria, descripcion, activa: 'Si' }]);
 
-  if (error) alert("Error: " + error.message);
+  if (error) mostrarNotificacion("Error: " + error.message, 'danger');
   else {
     bootstrap.Modal.getInstance(document.getElementById('modalNuevaNovedad')).hide();
+    mostrarNotificacion('Novedad guardada correctamente.', 'success');
     cargarNovedadesOperativas();
   }
 }
@@ -607,7 +746,7 @@ async function enviarMailsSeleccionados(tipo) {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
   if (!canWrite()) {
-    alert('No tenés permisos para enviar notificaciones.');
+    mostrarNotificacion('No tenés permisos para enviar notificaciones.', 'danger');
     return;
   }
 
@@ -624,7 +763,7 @@ async function enviarMailsSeleccionados(tipo) {
     tabla = 'admin_novedades'; asunto = '🚚 [Novedades Operativas] Cambios en Plataforma';
   }
 
-  if (ids.length === 0) return alert("Seleccioná al menos un elemento de la lista.");
+  if (ids.length === 0) return mostrarNotificacion("Seleccioná al menos un elemento de la lista.", 'warning');
 
   const { data } = await supabaseClient.from(tabla).select('*').in('id', ids);
   
@@ -636,9 +775,9 @@ async function enviarMailsSeleccionados(tipo) {
       asunto: asunto,
       mensaje: mensajeCuerpo
     });
-    alert(`📧 Notificación enviada exitosamente a ${EMAIL_ADMIN_GRUPO}`);
+    mostrarNotificacion(`📧 Notificación enviada exitosamente a ${EMAIL_ADMIN_GRUPO}`, 'success');
   } catch (err) {
-    alert("❌ Error al enviar mail: " + JSON.stringify(err));
+    mostrarNotificacion("❌ Error al enviar mail: " + (err.text || err.message || JSON.stringify(err)), 'danger');
   }
 }
 
@@ -658,15 +797,16 @@ async function aplicarCambiosMasivosClientes() {
 
   const ids = Array.from(document.querySelectorAll('.cliente-checkbox:checked')).map(input => input.value);
   const estado = document.getElementById('bulkEstadoCliente')?.value || '';
-  if (!ids.length) return alert('Seleccioná al menos un cliente.');
-  if (!estado) return alert('Elegí un estado para aplicar.');
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos un cliente.', 'warning');
+  if (!estado) return mostrarNotificacion('Elegí un estado para aplicar.', 'warning');
 
   const { error } = await supabaseClient.from('clientes').update({ estado }).in('id', ids);
-  if (error) return alert('No se pudieron aplicar los cambios: ' + error.message);
+  if (error) return mostrarNotificacion('No se pudieron aplicar los cambios: ' + error.message, 'danger');
   clientesData.forEach(cliente => {
     if (ids.includes(String(cliente.id))) cliente.estado = estado;
   });
   document.getElementById('bulkEstadoCliente').value = '';
+  mostrarNotificacion('Estados de clientes actualizados.', 'success');
   renderTablaEnvios();
 }
 
@@ -675,11 +815,170 @@ async function eliminarClientesSeleccionados() {
   if (!sessionOk || !canDelete()) return;
 
   const ids = Array.from(document.querySelectorAll('.cliente-checkbox:checked')).map(input => input.value);
-  if (!ids.length) return alert('Seleccioná al menos un cliente.');
-  if (!confirm(`¿Eliminar los ${ids.length} clientes seleccionados?`)) return;
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos un cliente.', 'warning');
+
+  const confirmar = await confirmarAccionModal('Eliminar clientes', `¿Eliminar los ${ids.length} clientes seleccionados?`);
+  if (!confirmar) return;
 
   const { error } = await supabaseClient.from('clientes').delete().in('id', ids);
-  if (error) return alert('No se pudieron eliminar los clientes: ' + error.message);
+  if (error) return mostrarNotificacion('No se pudieron eliminar los clientes: ' + error.message, 'danger');
   clientesData = clientesData.filter(cliente => !ids.includes(String(cliente.id)));
+  mostrarNotificacion('Clientes eliminados.', 'success');
   renderTablaEnvios();
 }
+
+async function eliminarTemplate(id) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+  if (!canDelete()) return mostrarNotificacion('Solo un admin puede eliminar referencias de plantillas.', 'danger');
+
+  const confirmar = await confirmarAccionModal('Eliminar plantilla', `¿Eliminar la referencia de plantilla "${id}" de Supabase?`);
+  if (!confirmar) return;
+
+  const { error } = await supabaseClient.from('templates').delete().eq('id', id);
+  if (error) return mostrarNotificacion('Error al eliminar la referencia: ' + error.message, 'danger');
+
+  mostrarNotificacion('Plantilla eliminada.', 'success');
+  await cargarDatosEnvios();
+}
+
+// =======================================================
+// GESTIÓN DE CONFIGURACIÓN Y APIS (Exclusivo Admin)
+// =======================================================
+async function cargarConfiguracionesSistema() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const tbody = document.getElementById('tblConfiguracionesSistema');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando configuraciones...</td></tr>';
+
+  const { data, error } = await supabaseClient
+    .from('configuraciones_sistema')
+    .select('*')
+    .order('clave', { ascending: true });
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error al cargar configuraciones: ${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">No hay configuraciones registradas en Supabase.</td></tr>';
+    return;
+  }
+
+  // Actualizar caché de AppConfig en memoria
+  data.forEach(item => {
+    if (window.AppConfig) window.AppConfig.set(item.clave, item.valor);
+  });
+
+  tbody.innerHTML = data.map(item => {
+    const inputType = item.es_secreta ? 'password' : 'text';
+    const toggleButton = item.es_secreta ? `
+      <button class="btn btn-outline-secondary btn-sm" type="button" onclick="togglePasswordVisibility('config-${item.clave}', this)" title="Mostrar / Ocultar">
+        <i class="bi bi-eye"></i>
+      </button>` : '';
+
+    return `
+      <tr data-config-key="${item.clave}">
+        <td>
+          <strong class="font-monospace small text-primary">${escapeHtml(item.clave)}</strong>
+          ${item.es_secreta ? '<span class="badge bg-secondary ms-1 small">Secreta</span>' : ''}
+        </td>
+        <td>
+          <small class="text-muted">${escapeHtml(item.descripcion || '-')}</small>
+        </td>
+        <td>
+          <div class="input-group input-group-sm">
+            <input type="${inputType}" class="form-control config-input" id="config-${item.clave}" value="${escapeHtml(item.valor || '')}" placeholder="Ingresá ${escapeHtml(item.clave)}...">
+            ${toggleButton}
+          </div>
+        </td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary" type="button" onclick="guardarConfiguracionSistema('${item.clave}')">
+            <i class="bi bi-floppy"></i> Guardar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isPass = input.type === 'password';
+  input.type = isPass ? 'text' : 'password';
+  if (btn) {
+    btn.innerHTML = `<i class="bi ${isPass ? 'bi-eye-slash' : 'bi-eye'}"></i>`;
+  }
+}
+
+async function guardarConfiguracionSistema(clave) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const input = document.getElementById(`config-${clave}`);
+  if (!input) return;
+  const nuevoValor = input.value.trim();
+
+  const { error } = await supabaseClient
+    .from('configuraciones_sistema')
+    .update({ valor: nuevoValor, updated_at: new Date().toISOString() })
+    .eq('clave', clave);
+
+  if (error) {
+    mostrarNotificacion(`Error al guardar "${clave}": ${error.message}`, 'danger');
+    return;
+  }
+
+  if (window.AppConfig) {
+    window.AppConfig.set(clave, nuevoValor);
+  }
+
+  mostrarNotificacion(`Configuración "${clave}" actualizada correctamente.`, 'success');
+}
+
+async function guardarTodasConfiguracionesSistema() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) return;
+
+  const rows = document.querySelectorAll('#tblConfiguracionesSistema tr[data-config-key]');
+  if (!rows.length) return mostrarNotificacion('No hay configuraciones para guardar.', 'warning');
+
+  const updates = [];
+  rows.forEach(row => {
+    const key = row.getAttribute('data-config-key');
+    const input = row.querySelector('.config-input');
+    if (key && input) {
+      const val = input.value.trim();
+      updates.push({ clave: key, valor: val });
+    }
+  });
+
+  try {
+    const promesas = updates.map(u => 
+      supabaseClient
+        .from('configuraciones_sistema')
+        .update({ valor: u.valor, updated_at: new Date().toISOString() })
+        .eq('clave', u.clave)
+    );
+    await Promise.all(promesas);
+
+    updates.forEach(u => {
+      if (window.AppConfig) window.AppConfig.set(u.clave, u.valor);
+    });
+
+    mostrarNotificacion(`Se guardaron las ${updates.length} variables correctamente.`, 'success');
+  } catch (err) {
+    mostrarNotificacion('Error al guardar configuraciones: ' + err.message, 'danger');
+  }
+}
+
+// Exposición global
+window.cargarConfiguracionesSistema = cargarConfiguracionesSistema;
+window.guardarConfiguracionSistema = guardarConfiguracionSistema;
+window.guardarTodasConfiguracionesSistema = guardarTodasConfiguracionesSistema;
+window.togglePasswordVisibility = togglePasswordVisibility;

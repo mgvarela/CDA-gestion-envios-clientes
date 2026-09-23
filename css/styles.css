@@ -238,6 +238,46 @@ h6, .h6 { font-size: 0.8rem !important; }
   font-size: 0.82rem;
 }
 
+.view-subnav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid #dbe3ec;
+}
+
+.view-subnav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.8rem;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.view-subnav-link:hover,
+.view-subnav-link.active {
+  color: #174f7c;
+  border-bottom-color: var(--color-cda-principal);
+}
+
+.view-subnav-link i {
+  font-size: 0.9rem;
+}
+
+.subnav-count {
+  min-width: 1.35rem;
+  padding: 0.1rem 0.35rem;
+  color: #52657b;
+  background: #eaf2f8;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
 .view-actions .btn {
   white-space: nowrap;
 }
@@ -499,6 +539,18 @@ h6, .h6 { font-size: 0.8rem !important; }
   max-width: 180px;
 }
 
+#tablaArrepentimientos th.col-monto,
+#tablaArrepentimientos td.col-monto {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+}
+
+#tablaArrepentimientos .recipient-fixed {
+  color: #52657b;
+  background: #f4f7fa;
+}
+
 .table-responsive {
   border-radius: 0.375rem;
   border: 1px solid #e2e8f0;
@@ -567,6 +619,11 @@ h6, .h6 { font-size: 0.8rem !important; }
   pointer-events: auto;
   box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   margin-bottom: 0;
+}
+
+#modalConfirmacionGlobal .modal-content {
+    background-color: #d1ecf1 !important;
+    border-color: #bee5eb !important;
 }
 /* Adaptabilidad Móvil y Pantallas Pequeñas (< 768px) */
 @media (max-width: 767.98px) {
@@ -674,6 +731,15 @@ h6, .h6 { font-size: 0.8rem !important; }
   .view-actions label {
     flex: 1 1 auto;
     text-align: center;
+  }
+
+  .view-subnav {
+    overflow-x: auto;
+  }
+
+  .view-subnav-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .bulk-actions-bar {

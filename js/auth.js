@@ -1,12 +1,13 @@
 // CONFIGURACIÓN CENTRAL DE APIS
-const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
-const SUPABASE_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
+const SUPABASE_URL = window.APP_ENV?.SUPABASE_URL || "https://ievbmsddbydxgnzknavl.supabase.co";
+const SUPABASE_KEY = window.APP_ENV?.SUPABASE_KEY || "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
 
-const EMAILJS_SERVICE_ID = "service_n9o55gp";   
-const EMAILJS_TEMPLATE_ID = "template_s8suav5";
-const EMAILJS_PUBLIC_KEY = "kyyRWVy91lz7Wqh0Y";            
+const EMAILJS_SERVICE_ID = window.APP_ENV?.EMAILJS_SERVICE_ID || "service_n9o55gp";   
+const EMAILJS_TEMPLATE_ID = window.APP_ENV?.EMAILJS_TEMPLATE_ID || "template_s8suav5";
+const EMAILJS_PUBLIC_KEY = window.APP_ENV?.EMAILJS_PUBLIC_KEY || "kyyRWVy91lz7Wqh0Y";            
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.supabaseClient = supabaseClient;
 let currentUserRole = 'viewer';
 
 function canWrite() {
@@ -56,6 +57,10 @@ async function loadUserRole() {
 
   currentUserRole = (!profileError && data?.role) ? data.role : 'viewer';
   applyRolePermissions();
+
+  if (currentUserRole === 'admin' && window.AppConfig && typeof window.AppConfig.loadFromDatabase === 'function') {
+    await window.AppConfig.loadFromDatabase(supabaseClient);
+  }
 }
 
 async function requireAuth() {
@@ -79,7 +84,7 @@ if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 }
 
 // NAVEGACIÓN Y CARGA DINÁMICA DE VISTAS
-async function navegar(seccion, elementoLink) {
+async function navegar(seccion, elementoLink, subvista = '') {
   closeSidebar();
   document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
   if (elementoLink) elementoLink.classList.add('active');
@@ -101,7 +106,10 @@ async function navegar(seccion, elementoLink) {
     if (seccion === 'seguimiento' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
     if (seccion === 'admin' && typeof cargarDatosAdmin === 'function') cargarDatosAdmin();
     if (seccion === 'pedidos' && typeof cargarPedidos === 'function') cargarPedidos();
-    if (seccion === 'arrepentimiento' && typeof cargarArrepentimientos === 'function') cargarArrepentimientos();
+    if (seccion === 'arrepentimiento' && typeof cargarArrepentimientos === 'function') {
+      await cargarArrepentimientos();
+      if (subvista === 'caja' && typeof cambiarVistaArrepentimientos === 'function') cambiarVistaArrepentimientos('caja');
+    }
 
   } catch (err) {
     mainContent.innerHTML = `<div class="alert alert-danger m-4">No se pudo cargar la sección. ${err.message}</div>`;
@@ -170,6 +178,22 @@ window.mostrarPanelUsuarios = function mostrarPanelUsuariosGlobal() {
   }
 };
 
+window.mostrarPanelConfiguracion = function mostrarPanelConfiguracionGlobal() {
+  document.querySelectorAll('#adminTabs .nav-link').forEach(link => link.classList.remove('active'));
+  document.querySelectorAll('.tab-content .tab-pane').forEach(panel => panel.classList.remove('show', 'active'));
+
+  const tab = document.getElementById('tab-configuracion');
+  const panel = document.getElementById('content-configuracion');
+  if (!tab || !panel) return;
+
+  tab.classList.add('active');
+  panel.classList.add('show', 'active');
+
+  if (typeof cargarConfiguracionesSistema === 'function') {
+    cargarConfiguracionesSistema();
+  }
+};
+
 // CARGA DE COMPONENTES MODALES
 async function cargarModales() {
   const container = document.getElementById('modalsContainer');
@@ -221,6 +245,18 @@ async function logout() {
 }
 
 window.onload = checkUser;
+
+// UTILIDAD DE ESCAPADO HTML GLOBAL
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+window.escapeHtml = escapeHtml;
 
 // HELPER DE NOTIFICACIONES DENTRO DEL PROYECTO (Sin alert JS)
 function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {

@@ -1,9 +1,13 @@
 // ==========================================
 // CONFIGURACIÓN DE APIS Y CLAVES
 // ==========================================
-const DISPATCHTRACK_API_KEY = ""; 
-const EPRESIS_API_KEY = "";       
-const MERCADO_FLEX_TOKEN = "";    
+function getDispatchTrackKey() {
+  return window.AppConfig ? window.AppConfig.get('DISPATCHTRACK_API_KEY') : "";
+}
+
+function getMercadoFlexToken() {
+  return window.AppConfig ? window.AppConfig.get('MERCADO_FLEX_TOKEN') : "";
+}
 
 // AUXILIARES DE SEGURIDAD Y LIMPIEZA
 function escaparSeguimiento(value) {
@@ -62,13 +66,14 @@ function renderizarResultadoSeguimiento(order, nroFactura, esSimulacion = false)
         <div class="col-md-6"><strong>Último estado:</strong> ${escaparSeguimiento(datos.estado)}</div>
         <div class="col-12"><strong>Franja horaria / ETA:</strong> ${escaparSeguimiento(datos.franja)}</div>
       </div>
-      ${esSimulacion ? '<small class="text-muted d-block mt-2">* Respuesta de prueba: configurá las claves API para consultar datos reales.</small>' : ''}
+      ${esSimulacion ? '<small class="text-muted d-block mt-2">* Respuesta de prueba: configurá las claves API en Administración para consultar datos reales.</small>' : ''}
     </div>`;
 }
 
 // 1. DISPATCHTRACK
 async function consultarDispatchTrack(nroFactura) {
-  if (!DISPATCHTRACK_API_KEY) {
+  const apiKey = getDispatchTrackKey();
+  if (!apiKey) {
     return renderizarResultadoSeguimiento({
       carrier: 'DispatchTrack',
       status: 'EN CAMINO',
@@ -79,7 +84,7 @@ async function consultarDispatchTrack(nroFactura) {
   }
 
   const response = await fetch(`https://api.dispatchtrack.com/api/v1/orders/${encodeURIComponent(nroFactura)}`, {
-    headers: { 'X-DISPATCHTRACK-KEY': DISPATCHTRACK_API_KEY, 'Content-Type': 'application/json' }
+    headers: { 'X-DISPATCHTRACK-KEY': apiKey, 'Content-Type': 'application/json' }
   });
   if (!response.ok) throw new Error(response.status === 404 ? "Factura no encontrada en DispatchTrack." : "Error de conexión con DispatchTrack.");
   const data = await response.json();
@@ -88,7 +93,8 @@ async function consultarDispatchTrack(nroFactura) {
 
 // 2. MERCADO EN VÍOS FLEX
 async function consultarFlex(nroFactura) {
-  if (!MERCADO_FLEX_TOKEN) {
+  const token = getMercadoFlexToken();
+  if (!token) {
     return renderizarResultadoSeguimiento({
       carrier: 'Mercado Envíos Flex',
       status: 'EN REPARTO (FLEX)',
@@ -99,7 +105,7 @@ async function consultarFlex(nroFactura) {
   }
 
   const response = await fetch(`https://api.mercadolibre.com/shipments/${encodeURIComponent(nroFactura)}`, {
-    headers: { 'Authorization': `Bearer ${MERCADO_FLEX_TOKEN}` }
+    headers: { 'Authorization': `Bearer ${token}` }
   });
   if (!response.ok) throw new Error("Envío Flex no encontrado o Token expirado.");
   const data = await response.json();
