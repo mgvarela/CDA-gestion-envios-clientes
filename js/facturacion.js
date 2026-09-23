@@ -54,6 +54,7 @@ async function cargarFacturacion() {
 function estadoClaseFacturacion(estado) {
   if (estado === 'Facturado') return 'bg-success';
   if (estado === 'Corregir') return 'bg-warning text-dark';
+  if (estado === 'Pedido Corregido') return 'bg-info text-dark';
   return 'bg-primary';
 }
 
@@ -92,15 +93,19 @@ function renderizarFacturacion() {
     if (vistaFacturacion === 'principal') {
       acciones = `
         <button class="btn btn-sm btn-outline-secondary me-1" type="button" onclick="abrirModalFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Editar pedido"><i class="bi bi-pencil"></i></button>
-        <button class="btn btn-sm btn-primary" type="button" onclick="enviarPedidoACaja('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-cash-stack"></i> Enviar a Caja</button>`;
+        <button class="btn btn-sm btn-primary me-1" type="button" onclick="enviarPedidoACaja('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-cash-stack"></i> Enviar a Caja</button>
+        <button class="btn btn-sm btn-outline-danger" type="button" onclick="eliminarPedidoFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Eliminar pedido"><i class="bi bi-trash"></i></button>`;
     } else if (vistaFacturacion === 'caja') {
       acciones = `
         <button class="btn btn-sm btn-outline-warning me-1" type="button" onclick="devolverPedidoACorreccion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Devolver para corregir"><i class="bi bi-arrow-return-left"></i></button>
-        <button class="btn btn-sm btn-success" type="button" onclick="abrirModalComprobanteFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-check2-circle"></i> Facturar</button>`;
+        <button class="btn btn-sm btn-success me-1" type="button" onclick="abrirModalComprobanteFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-check2-circle"></i> Facturar</button>
+        <button class="btn btn-sm btn-outline-danger" type="button" onclick="eliminarPedidoFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Eliminar pedido"><i class="bi bi-trash"></i></button>`;
     } else {
-      acciones = item.exportado_sheet
+      const envioGoogleSheets = item.exportado_sheet
         ? '<span class="badge bg-success"><i class="bi bi-cloud-check"></i> Enviado</span>'
         : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="enviarFacturadoAGoogleSheet('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-cloud-arrow-up"></i> Enviar a Google Sheets</button>`;
+      acciones = `${envioGoogleSheets}
+        <button class="btn btn-sm btn-outline-danger ms-1" type="button" onclick="eliminarPedidoFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Eliminar pedido"><i class="bi bi-trash"></i></button>`;
     }
 
     const notas = vistaFacturacion === 'facturados' || !puedeEditar
@@ -200,7 +205,9 @@ async function guardarPedidoFacturacion(event) {
 
 async function enviarPedidoACaja(id) {
   if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
-  const { error } = await supabaseClient.from('facturacion_pedidos').update({ en_caja: true }).eq('id', id);
+  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
+  const estado = pedido?.estado === 'Corregir' ? 'Pedido Corregido' : 'Pedido Nuevo';
+  const { error } = await supabaseClient.from('facturacion_pedidos').update({ en_caja: true, estado }).eq('id', id);
   if (error) return mostrarNotificacion('No se pudo enviar el pedido a Caja: ' + error.message, 'danger');
   cambiarVistaFacturacion('caja');
   await cargarFacturacion();
@@ -214,6 +221,22 @@ async function devolverPedidoACorreccion(id) {
   cambiarVistaFacturacion('principal');
   await cargarFacturacion();
   mostrarNotificacion('Pedido devuelto para corregir.', 'warning');
+}
+
+async function eliminarPedidoFacturacion(id) {
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
+  const confirmar = await confirmarAccionModal(
+    'Eliminar pedido',
+    `¿Eliminar el pedido "${pedido?.pedido || 'sin número'}" de Facturación? Esta acción no se puede deshacer.`
+  );
+  if (!confirmar) return;
+
+  const { error } = await supabaseClient.from('facturacion_pedidos').delete().eq('id', id);
+  if (error) return mostrarNotificacion('No se pudo eliminar el pedido: ' + error.message, 'danger');
+  listaFacturacion = listaFacturacion.filter(item => String(item.id) !== String(id));
+  renderizarFacturacion();
+  mostrarNotificacion('Pedido eliminado de Facturación.', 'success');
 }
 
 function abrirModalComprobanteFacturacion(id) {
@@ -338,6 +361,7 @@ window.agregarCatalogoFacturacion = agregarCatalogoFacturacion;
 window.guardarPedidoFacturacion = guardarPedidoFacturacion;
 window.enviarPedidoACaja = enviarPedidoACaja;
 window.devolverPedidoACorreccion = devolverPedidoACorreccion;
+window.eliminarPedidoFacturacion = eliminarPedidoFacturacion;
 window.abrirModalComprobanteFacturacion = abrirModalComprobanteFacturacion;
 window.confirmarFacturacion = confirmarFacturacion;
 window.actualizarNotasFacturacion = actualizarNotasFacturacion;

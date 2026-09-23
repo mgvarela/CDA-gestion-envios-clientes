@@ -402,6 +402,12 @@ create table if not exists public.facturacion_pedidos (
   updated_at timestamptz not null default now()
 );
 
+alter table public.facturacion_pedidos
+  drop constraint if exists facturacion_pedidos_estado_check;
+alter table public.facturacion_pedidos
+  add constraint facturacion_pedidos_estado_check
+  check (estado in ('Pedido Nuevo', 'Corregir', 'Pedido Corregido', 'Facturado'));
+
 create table if not exists public.facturacion_tiendas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null unique,
