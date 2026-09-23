@@ -78,9 +78,11 @@ function renderizarFacturacion() {
   document.getElementById('contadorFacturacionCaja').textContent = pendientesCaja.length;
   document.getElementById('contadorFacturacionFacturados').textContent = facturados.length;
   document.getElementById('resumenFacturacion').textContent = `${registros.length} registros`;
+  document.getElementById('accionesFacturados').hidden = vistaFacturacion !== 'facturados';
+  document.getElementById('columnaSeleccionFacturados').hidden = vistaFacturacion !== 'facturados';
 
   if (!registros.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No hay pedidos en esta bandeja.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4">No hay pedidos en esta bandeja.</td></tr>';
     return;
   }
 
@@ -95,18 +97,25 @@ function renderizarFacturacion() {
       acciones = `
         <button class="btn btn-sm btn-outline-warning me-1" type="button" onclick="devolverPedidoACorreccion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Devolver para corregir"><i class="bi bi-arrow-return-left"></i></button>
         <button class="btn btn-sm btn-success" type="button" onclick="abrirModalComprobanteFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-check2-circle"></i> Facturar</button>`;
-    } else if (!item.exportado_sheet) {
-      acciones = `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="enviarFacturadoAGoogleSheet('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-cloud-arrow-up"></i> Reintentar envío</button>`;
+    } else {
+      acciones = item.exportado_sheet
+        ? '<span class="badge bg-success"><i class="bi bi-cloud-check"></i> Enviado</span>'
+        : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="enviarFacturadoAGoogleSheet('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-cloud-arrow-up"></i> Enviar a Google Sheets</button>`;
     }
 
+    const notas = vistaFacturacion === 'facturados' || !puedeEditar
+      ? `<small>${escapeHtml(item.notas || '-')}</small>`
+      : `<textarea class="form-control form-control-sm" rows="2" maxlength="1000" placeholder="Agregar comentario..." onchange="actualizarNotasFacturacion('${item.id}', this.value)">${escapeHtml(item.notas || '')}</textarea>`;
+
     return `<tr>
+      ${vistaFacturacion === 'facturados' ? `<td class="text-center"><input class="form-check-input chk-facturado" type="checkbox" value="${item.id}" aria-label="Seleccionar pedido ${escapeHtml(item.pedido || '')}"></td>` : '<td hidden></td>'}
       <td>${item.fecha_compra ? new Date(`${item.fecha_compra}T00:00:00`).toLocaleDateString('es-AR') : '-'}</td>
       <td>${escapeHtml(item.tienda || '-')}</td>
       <td>${escapeHtml(item.id_compra || '-')}</td>
       <td><strong>${escapeHtml(item.pedido || '-')}</strong></td>
       <td>${escapeHtml(item.operador || '-')}</td>
       <td><span class="badge ${estadoClaseFacturacion(item.estado)}">${escapeHtml(item.estado || 'Pedido Nuevo')}</span></td>
-      <td><small>${escapeHtml(item.notas || '-')}</small></td>
+      <td>${notas}</td>
       <td>${escapeHtml(item.numero_comprobante || '-')}</td>
       <td class="text-end text-nowrap">${acciones || '-'}</td>
     </tr>`;
@@ -156,26 +165,29 @@ async function guardarPedidoFacturacion(event) {
 
   const id = document.getElementById('factPedidoId').value;
   const pedido = textoFacturacion(document.getElementById('factPedido').value, 100);
-  let duplicateQuery = supabaseClient.from('facturacion_pedidos').select('id, estado').eq('pedido', pedido).limit(1);
+  const idCompra = textoFacturacion(document.getElementById('factIdCompra').value, 100);
+  if (!idCompra) return mostrarNotificacion('El ID de compra es obligatorio.', 'warning');
+
+  let duplicateQuery = supabaseClient.from('facturacion_pedidos').select('id, pedido, estado').eq('id_compra', idCompra).limit(1);
   if (id) duplicateQuery = duplicateQuery.neq('id', id);
   const { data: duplicados, error: errorDuplicados } = await duplicateQuery;
-  if (errorDuplicados) return mostrarNotificacion('No se pudo validar el pedido: ' + errorDuplicados.message, 'danger');
+  if (errorDuplicados) return mostrarNotificacion('No se pudo validar el ID de compra: ' + errorDuplicados.message, 'danger');
   if (duplicados?.length) {
-    const confirmar = await confirmarAccionModal('Pedido duplicado', `El pedido "${pedido}" ya existe con estado "${duplicados[0].estado}". ¿Deseas cargarlo de todas formas?`);
+    const confirmar = await confirmarAccionModal('ID de compra duplicado', `El ID de compra "${idCompra}" ya existe en el pedido "${duplicados[0].pedido}" con estado "${duplicados[0].estado}". ¿Deseas cargarlo de todas formas?`);
     if (!confirmar) return;
   }
 
   const registro = {
     fecha_compra: document.getElementById('factFechaCompra').value,
     tienda: textoFacturacion(document.getElementById('factTienda').value, 100),
-    id_compra: textoFacturacion(document.getElementById('factIdCompra').value, 100),
+    id_compra: idCompra,
     pedido,
     operador: textoFacturacion(document.getElementById('factOperador').value, 100),
     estado: document.getElementById('factEstado').value || 'Pedido Nuevo',
     notas: textoFacturacion(document.getElementById('factNotas').value, 1000),
     en_caja: false
   };
-  if (!registro.fecha_compra || !registro.tienda || !registro.pedido) return mostrarNotificacion('Fecha, tienda y pedido son obligatorios.', 'warning');
+  if (!registro.fecha_compra || !registro.tienda || !registro.id_compra || !registro.pedido) return mostrarNotificacion('Fecha, tienda, ID de compra y pedido son obligatorios.', 'warning');
 
   const { error } = id
     ? await supabaseClient.from('facturacion_pedidos').update(registro).eq('id', id)
@@ -227,9 +239,63 @@ async function confirmarFacturacion(event) {
   }).eq('id', id);
   if (error) return mostrarNotificacion('No se pudo facturar el pedido: ' + error.message, 'danger');
   bootstrap.Modal.getInstance(document.getElementById('modalComprobanteFacturacion'))?.hide();
-  await enviarFacturadoAGoogleSheet(id, false);
   await cargarFacturacion();
   mostrarNotificacion('Pedido facturado correctamente.', 'success');
+}
+
+async function actualizarNotasFacturacion(id, value) {
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const notas = textoFacturacion(value, 1000);
+  const { error } = await supabaseClient.from('facturacion_pedidos').update({ notas }).eq('id', id);
+  if (error) return mostrarNotificacion('No se pudo actualizar el comentario: ' + error.message, 'danger');
+  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
+  if (pedido) pedido.notas = notas;
+  mostrarNotificacion('Comentario actualizado.', 'success');
+}
+
+function seleccionarTodosFacturados(checked) {
+  document.querySelectorAll('.chk-facturado').forEach(input => {
+    input.checked = checked;
+  });
+}
+
+function csvEscapeFacturacion(value) {
+  const text = String(value ?? '');
+  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+async function descargarFacturadosSeleccionados() {
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const ids = Array.from(document.querySelectorAll('.chk-facturado:checked')).map(input => input.value);
+  if (!ids.length) return mostrarNotificacion('Seleccioná al menos un pedido facturado.', 'warning');
+
+  const registros = listaFacturacion.filter(item => ids.includes(String(item.id)) && item.estado === 'Facturado');
+  const confirmar = await confirmarAccionModal(
+    'Descargar y quitar facturados',
+    `Se descargará un CSV con ${registros.length} pedido(s) y luego se quitarán de la tabla de Facturación. ¿Confirmás la operación?`
+  );
+  if (!confirmar) return;
+
+  const encabezados = ['Fecha compra', 'Tienda', 'ID compra', 'Pedido', 'Operador', 'Estado', 'Notas / comentarios', 'Número comprobante', 'Fecha facturación'];
+  const csv = [
+    encabezados.join(';'),
+    ...registros.map(item => [
+      item.fecha_compra || '', item.tienda || '', item.id_compra || '', item.pedido || '', item.operador || '', item.estado || '', item.notas || '', item.numero_comprobante || '', item.fecha_facturacion ? new Date(item.fecha_facturacion).toLocaleString('es-AR') : ''
+    ].map(csvEscapeFacturacion).join(';'))
+  ].join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `facturados_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+
+  const { error } = await supabaseClient.from('facturacion_pedidos').delete().in('id', ids);
+  if (error) return mostrarNotificacion('El CSV se descargó, pero no se pudieron quitar los pedidos: ' + error.message, 'danger');
+  listaFacturacion = listaFacturacion.filter(item => !ids.includes(String(item.id)));
+  renderizarFacturacion();
+  mostrarNotificacion(`Se descargaron y quitaron ${ids.length} pedido(s) facturado(s).`, 'success');
 }
 
 function getFacturacionWebhookUrl() {
@@ -274,4 +340,7 @@ window.enviarPedidoACaja = enviarPedidoACaja;
 window.devolverPedidoACorreccion = devolverPedidoACorreccion;
 window.abrirModalComprobanteFacturacion = abrirModalComprobanteFacturacion;
 window.confirmarFacturacion = confirmarFacturacion;
+window.actualizarNotasFacturacion = actualizarNotasFacturacion;
+window.seleccionarTodosFacturados = seleccionarTodosFacturados;
+window.descargarFacturadosSeleccionados = descargarFacturadosSeleccionados;
 window.enviarFacturadoAGoogleSheet = enviarFacturadoAGoogleSheet;

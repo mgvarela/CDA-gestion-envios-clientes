@@ -440,7 +440,7 @@ for update to authenticated using (public.can_edit_module('facturacion')) with c
 
 drop policy if exists facturacion_pedidos_delete on public.facturacion_pedidos;
 create policy facturacion_pedidos_delete on public.facturacion_pedidos
-for delete to authenticated using (public.current_user_role() = 'admin');
+for delete to authenticated using (public.can_edit_module('facturacion'));
 
 drop policy if exists facturacion_tiendas_select on public.facturacion_tiendas;
 create policy facturacion_tiendas_select on public.facturacion_tiendas

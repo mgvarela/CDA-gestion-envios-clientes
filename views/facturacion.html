@@ -27,6 +27,12 @@
     </button>
   </nav>
 
+  <div class="d-flex justify-content-end mb-3" id="accionesFacturados" hidden>
+    <button class="btn btn-outline-success btn-sm" type="button" onclick="descargarFacturadosSeleccionados()" data-role-action="write">
+      <i class="bi bi-file-earmark-arrow-down"></i> Descargar seleccionados y quitar de Facturación
+    </button>
+  </div>
+
   <div class="filter-panel mb-3">
     <div class="filter-heading"><i class="bi bi-funnel"></i><span>Buscar pedidos</span></div>
     <div class="row g-2 align-items-center">
@@ -52,6 +58,7 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
+            <th id="columnaSeleccionFacturados" width="40" hidden><input class="form-check-input" type="checkbox" id="chkTodosFacturados" onchange="seleccionarTodosFacturados(this.checked)" title="Seleccionar todos"></th>
             <th>Fecha compra</th>
             <th>Tienda</th>
             <th>ID compra</th>
@@ -64,7 +71,7 @@
           </tr>
         </thead>
         <tbody id="tblFacturacion">
-          <tr><td colspan="9" class="text-center py-4">Cargando pedidos...</td></tr>
+          <tr><td colspan="10" class="text-center py-4">Cargando pedidos...</td></tr>
         </tbody>
       </table>
     </div>
@@ -100,13 +107,13 @@
                 </div>
               </div>
               <div class="col-md-6">
-                <label class="form-label small fw-semibold" for="factIdCompra">ID de compra</label>
-                <input class="form-control form-control-sm" type="text" id="factIdCompra" maxlength="100" placeholder="Identificador de la compra">
+                <label class="form-label small fw-semibold" for="factIdCompra">ID de compra *</label>
+                <input class="form-control form-control-sm" type="text" id="factIdCompra" maxlength="100" required placeholder="Identificador de la compra">
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold" for="factPedido">Pedido *</label>
                 <input class="form-control form-control-sm" type="text" id="factPedido" maxlength="100" required placeholder="Número de pedido">
-                <div class="form-text">Se avisará si el pedido ya está registrado.</div>
+                <div class="form-text">El duplicado se valida por ID de compra.</div>
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold" for="factEstado">Estado</label>
