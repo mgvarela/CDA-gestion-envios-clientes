@@ -160,4 +160,26 @@
       </div>
     </div>
   </div>
+
+  <div class="modal fade" id="modalCatalogoFacturacion" tabindex="-1" aria-labelledby="modalCatalogoFacturacionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fs-6 fw-bold" id="modalCatalogoFacturacionLabel"><i class="bi bi-plus-circle text-primary me-2"></i>Agregar catálogo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <form id="formCatalogoFacturacion" onsubmit="guardarCatalogoFacturacion(event)">
+          <div class="modal-body py-3">
+            <input type="hidden" id="factCatalogoTipo">
+            <label class="form-label small fw-semibold" id="factCatalogoNombreLabel" for="factCatalogoNombre">Nombre</label>
+            <input class="form-control form-control-sm" type="text" id="factCatalogoNombre" maxlength="100" required autocomplete="off">
+          </div>
+          <div class="modal-footer border-0 pt-0">
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-check2"></i> Agregar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </section>

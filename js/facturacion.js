@@ -101,11 +101,7 @@ function renderizarFacturacion() {
         <button class="btn btn-sm btn-success me-1" type="button" onclick="abrirModalComprobanteFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-check2-circle"></i> Facturar</button>
         <button class="btn btn-sm btn-outline-danger" type="button" onclick="eliminarPedidoFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Eliminar pedido"><i class="bi bi-trash"></i></button>`;
     } else {
-      const envioGoogleSheets = item.exportado_sheet
-        ? '<span class="badge bg-success"><i class="bi bi-cloud-check"></i> Enviado</span>'
-        : `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="enviarFacturadoAGoogleSheet('${item.id}')" ${puedeEditar ? '' : 'hidden'}><i class="bi bi-cloud-arrow-up"></i> Enviar a Google Sheets</button>`;
-      acciones = `${envioGoogleSheets}
-        <button class="btn btn-sm btn-outline-danger ms-1" type="button" onclick="eliminarPedidoFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Eliminar pedido"><i class="bi bi-trash"></i></button>`;
+      acciones = `<button class="btn btn-sm btn-outline-danger" type="button" onclick="eliminarPedidoFacturacion('${item.id}')" ${puedeEditar ? '' : 'hidden'} title="Eliminar pedido"><i class="bi bi-trash"></i></button>`;
     }
 
     const notas = vistaFacturacion === 'facturados' || !puedeEditar
@@ -154,11 +150,26 @@ async function abrirModalFacturacion(id = '') {
 
 async function agregarCatalogoFacturacion(tipo) {
   if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
-  const nombre = textoFacturacion(window.prompt(`Nombre del nuevo ${tipo}:`), 100);
+  const esTienda = tipo === 'tienda';
+  document.getElementById('formCatalogoFacturacion').reset();
+  document.getElementById('factCatalogoTipo').value = tipo;
+  document.getElementById('modalCatalogoFacturacionLabel').innerHTML = `<i class="bi bi-plus-circle text-primary me-2"></i>Agregar ${esTienda ? 'tienda' : 'operador'}`;
+  document.getElementById('factCatalogoNombreLabel').textContent = `Nombre de ${esTienda ? 'la tienda' : 'el operador'}`;
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCatalogoFacturacion'));
+  modal.show();
+  document.getElementById('modalCatalogoFacturacion').addEventListener('shown.bs.modal', () => document.getElementById('factCatalogoNombre').focus(), { once: true });
+}
+
+async function guardarCatalogoFacturacion(event) {
+  event.preventDefault();
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const tipo = document.getElementById('factCatalogoTipo').value;
+  const nombre = textoFacturacion(document.getElementById('factCatalogoNombre').value, 100);
   if (!nombre) return;
   const tabla = tipo === 'tienda' ? 'facturacion_tiendas' : 'facturacion_operadores';
   const { error } = await supabaseClient.from(tabla).upsert({ nombre }, { onConflict: 'nombre' });
   if (error) return mostrarNotificacion(`No se pudo agregar el ${tipo}: ${error.message}`, 'danger');
+  bootstrap.Modal.getInstance(document.getElementById('modalCatalogoFacturacion'))?.hide();
   await cargarCatalogosFacturacion();
   cargarSelectCatalogoFacturacion(tipo === 'tienda' ? 'factTienda' : 'factOperador', tipo === 'tienda' ? tiendasFacturacion : operadoresFacturacion, tipo === 'tienda' ? 'Seleccionar tienda...' : 'Seleccionar operador...', nombre);
   mostrarNotificacion(`${tipo === 'tienda' ? 'Tienda' : 'Operador'} agregado.`, 'success');
@@ -258,6 +269,7 @@ async function confirmarFacturacion(event) {
   const { error } = await supabaseClient.from('facturacion_pedidos').update({
     numero_comprobante: numeroComprobante,
     estado: 'Facturado',
+    notas: '',
     fecha_facturacion: new Date().toISOString()
   }).eq('id', id);
   if (error) return mostrarNotificacion('No se pudo facturar el pedido: ' + error.message, 'danger');
@@ -321,43 +333,12 @@ async function descargarFacturadosSeleccionados() {
   mostrarNotificacion(`Se descargaron y quitaron ${ids.length} pedido(s) facturado(s).`, 'success');
 }
 
-function getFacturacionWebhookUrl() {
-  return window.AppConfig ? window.AppConfig.get('GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL') : '';
-}
-
-async function enviarFacturadoAGoogleSheet(id, mostrarResultado = true) {
-  const pedido = listaFacturacion.find(item => String(item.id) === String(id)) || (await supabaseClient.from('facturacion_pedidos').select('*').eq('id', id).maybeSingle()).data;
-  if (!pedido) return;
-  const webhook = getFacturacionWebhookUrl();
-  if (!webhook || webhook.includes('TU_SCRIPT_ID')) {
-    if (mostrarResultado) mostrarNotificacion('Falta configurar el webhook de Google Sheets.', 'warning');
-    return;
-  }
-  try {
-    await fetch(webhook, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...pedido, hoja_destino: 'pedidos_facturados', tipo_registro: 'facturacion' })
-    });
-    const { error } = await supabaseClient.from('facturacion_pedidos').update({ exportado_sheet: true, fecha_exportacion: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
-    const local = listaFacturacion.find(item => String(item.id) === String(id));
-    if (local) local.exportado_sheet = true;
-    if (mostrarResultado) {
-      renderizarFacturacion();
-      mostrarNotificacion('Pedido enviado a Google Sheets.', 'success');
-    }
-  } catch (error) {
-    if (mostrarResultado) mostrarNotificacion('No se pudo enviar a Google Sheets: ' + error.message, 'danger');
-  }
-}
-
 window.cargarFacturacion = cargarFacturacion;
 window.renderizarFacturacion = renderizarFacturacion;
 window.cambiarVistaFacturacion = cambiarVistaFacturacion;
 window.abrirModalFacturacion = abrirModalFacturacion;
 window.agregarCatalogoFacturacion = agregarCatalogoFacturacion;
+window.guardarCatalogoFacturacion = guardarCatalogoFacturacion;
 window.guardarPedidoFacturacion = guardarPedidoFacturacion;
 window.enviarPedidoACaja = enviarPedidoACaja;
 window.devolverPedidoACorreccion = devolverPedidoACorreccion;
@@ -367,4 +348,3 @@ window.confirmarFacturacion = confirmarFacturacion;
 window.actualizarNotasFacturacion = actualizarNotasFacturacion;
 window.seleccionarTodosFacturados = seleccionarTodosFacturados;
 window.descargarFacturadosSeleccionados = descargarFacturadosSeleccionados;
-window.enviarFacturadoAGoogleSheet = enviarFacturadoAGoogleSheet;
