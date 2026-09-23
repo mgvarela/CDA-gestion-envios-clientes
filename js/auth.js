@@ -9,9 +9,21 @@ const EMAILJS_PUBLIC_KEY = window.APP_ENV?.EMAILJS_PUBLIC_KEY || "kyyRWVy91lz7Wq
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 window.supabaseClient = supabaseClient;
 let currentUserRole = 'viewer';
+let currentUserModulePermissions = {};
+let currentModule = '';
 
-function canWrite() {
-  return ['admin', 'editor'].includes(currentUserRole);
+const APP_MODULES = ['admin', 'envios', 'pedidos', 'facturacion', 'arrepentimiento', 'seguimiento', 'plantillas'];
+
+function getModulePermission(module) {
+  return currentUserModulePermissions?.[module] || '';
+}
+
+function canAccessModule(module) {
+  return currentUserRole === 'admin' || ['view', 'edit'].includes(getModulePermission(module));
+}
+
+function canWrite(module = currentModule) {
+  return currentUserRole === 'admin' || (currentUserRole === 'editor' && getModulePermission(module) === 'edit');
 }
 
 function canDelete() {
@@ -39,6 +51,10 @@ function applyRolePermissions() {
   adminOnlyEls.forEach(el => {
     el.hidden = currentUserRole !== 'admin';
   });
+
+  document.querySelectorAll('[data-module]').forEach(el => {
+    el.hidden = !canAccessModule(el.dataset.module);
+  });
 }
 
 async function loadUserRole() {
@@ -51,11 +67,14 @@ async function loadUserRole() {
 
   const { data, error: profileError } = await supabaseClient
     .from('profiles')
-    .select('role')
+    .select('role, module_permissions')
     .eq('id', session.user.id)
     .maybeSingle();
 
   currentUserRole = (!profileError && data?.role) ? data.role : 'viewer';
+  currentUserModulePermissions = (!profileError && data?.module_permissions && typeof data.module_permissions === 'object')
+    ? data.module_permissions
+    : {};
   applyRolePermissions();
 
   if (currentUserRole === 'admin' && window.AppConfig && typeof window.AppConfig.loadFromDatabase === 'function') {
@@ -85,6 +104,12 @@ if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 
 // NAVEGACIÓN Y CARGA DINÁMICA DE VISTAS
 async function navegar(seccion, elementoLink, subvista = '') {
+  if (!canAccessModule(seccion)) {
+    mostrarNotificacion('No tenés acceso a este módulo.', 'danger');
+    return;
+  }
+
+  currentModule = seccion;
   closeSidebar();
   document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
   if (elementoLink) elementoLink.classList.add('active');
@@ -103,9 +128,9 @@ async function navegar(seccion, elementoLink, subvista = '') {
 
     // Disparar carga de datos según sección
     if (seccion === 'envios' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
-    if (seccion === 'seguimiento' && typeof cargarDatosEnvios === 'function') cargarDatosEnvios();
     if (seccion === 'admin' && typeof cargarDatosAdmin === 'function') cargarDatosAdmin();
     if (seccion === 'pedidos' && typeof cargarPedidos === 'function') cargarPedidos();
+    if (seccion === 'facturacion' && typeof cargarFacturacion === 'function') cargarFacturacion();
     if (seccion === 'arrepentimiento' && typeof cargarArrepentimientos === 'function') {
       await cargarArrepentimientos();
       if (subvista === 'caja' && typeof cambiarVistaArrepentimientos === 'function') cambiarVistaArrepentimientos('caja');
@@ -231,9 +256,14 @@ async function checkUser() {
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
     restaurarEstadoSidebar();
-    navegar('admin', document.querySelector('.sidebar .nav-link.active'));
+    const firstAccessibleLink = document.querySelector('.sidebar [data-module]:not([hidden]) .nav-link');
+    const firstAccessibleModule = firstAccessibleLink?.closest('[data-module]')?.dataset.module;
+    if (firstAccessibleModule) navegar(firstAccessibleModule, firstAccessibleLink);
+    else document.getElementById('mainContent').innerHTML = '<div class="alert alert-warning m-4">Tu usuario no tiene módulos asignados. Pedile a un administrador que habilite al menos uno.</div>';
   } else {
     currentUserRole = 'viewer';
+    currentUserModulePermissions = {};
+    currentModule = '';
     document.getElementById('loginSection').classList.remove('d-none');
     document.getElementById('appSection').classList.add('d-none');
   }

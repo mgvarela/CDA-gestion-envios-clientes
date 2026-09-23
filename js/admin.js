@@ -241,15 +241,17 @@ const actionsContainer = document.createElement('div');
 actionsContainer.className = 'd-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top';
 
 // 2. Botón Editar
-const editButton = document.createElement('button');
-editButton.type = 'button';
-editButton.className = 'btn btn-sm btn-outline-primary';
-editButton.innerHTML = '<i class="bi bi-pencil"></i> Editar';
-editButton.addEventListener('click', () => editarTemplate(t.id));
-actionsContainer.appendChild(editButton);
+if (canWrite('plantillas')) {
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn-sm btn-outline-primary';
+  editButton.innerHTML = '<i class="bi bi-pencil"></i> Editar';
+  editButton.addEventListener('click', () => editarTemplate(t.id));
+  actionsContainer.appendChild(editButton);
+}
 
 // 3. Botón Eliminar (solo si tiene permisos)
-if (canDelete()) { // Asumiendo que esta función de auth.js está en scope
+if (canDelete()) {
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
   deleteButton.className = 'btn btn-sm btn-outline-danger';
@@ -268,6 +270,7 @@ activeInput.type = 'checkbox';
 activeInput.className = 'form-check-input';
 activeInput.checked = t.activo !== false;
 activeInput.id = `template-active-${sanitizeTemplateId(t.id)}`;
+activeInput.disabled = !canWrite('plantillas');
 activeInput.addEventListener('change', () => actualizarEstadoTemplate(t.id, activeInput.checked));
 
 const activeLabel = document.createElement('label');
@@ -289,6 +292,10 @@ item.appendChild(actionsContainer);
 async function abrirModalPlantillas() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
+  if (!canAccessModule('plantillas')) {
+    mostrarNotificacion('No tenés acceso al módulo de plantillas.', 'danger');
+    return;
+  }
   const modalEl = document.getElementById('modalTemplates');
   if (!modalEl) return mostrarNotificacion('No se pudo cargar el panel de plantillas.', 'danger');
 
@@ -300,7 +307,7 @@ async function abrirModalPlantillas() {
 }
 
 async function actualizarEstadoTemplate(id, activo) {
-  if (!(await requireAuth()) || !canWrite()) return;
+  if (!(await requireAuth()) || !canWrite('plantillas')) return;
   const { error } = await supabaseClient.from('templates').update({ activo }).eq('id', id);
   if (error) return mostrarNotificacion('No se pudo actualizar la plantilla: ' + error.message, 'danger');
   const template = templatesData.find(item => String(item.id) === String(id));
@@ -422,7 +429,7 @@ async function guardarCliente() {
 async function guardarTemplate() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
-  if (!canWrite()) {
+  if (!canWrite('plantillas')) {
     mostrarNotificacion('No tenés permisos para guardar plantillas.', 'danger');
     return;
   }
@@ -603,14 +610,14 @@ async function cargarNovedadesOperativas() {
 
 async function cargarUsuariosRoles() {
   const sessionOk = await requireAuth();
-  if (!sessionOk || !canWrite()) return;
+  if (!sessionOk || !canDelete()) return;
 
   const tbody = document.getElementById('tblUsuariosPermisos');
   if (!tbody) return;
 
   const { data: perfiles, error } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false });
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">No se pudieron cargar los permisos: ${escapeHtml(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">No se pudieron cargar los permisos: ${escapeHtml(error.message)}</td></tr>`;
     console.error(error);
     return;
   }
@@ -618,12 +625,27 @@ async function cargarUsuariosRoles() {
   tbody.innerHTML = '';
 
   if (!perfiles || perfiles.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3">Sin usuarios registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3">Sin usuarios registrados.</td></tr>';
     return;
   }
 
   perfiles.forEach(usuario => {
     const row = document.createElement('tr');
+    const permisos = usuario.module_permissions && typeof usuario.module_permissions === 'object' ? usuario.module_permissions : {};
+    const etiquetasModulos = {
+      admin: 'Admin', envios: 'Envíos', pedidos: 'Pedidos', facturacion: 'Facturación', arrepentimiento: 'Arrepentimiento', seguimiento: 'Seguimiento', plantillas: 'Plantillas'
+    };
+    const permisosModulos = APP_MODULES.map(modulo => {
+      const permiso = permisos[modulo];
+      const esAdmin = usuario.role === 'admin';
+      const puedeVer = ['view', 'edit'].includes(permiso) || esAdmin;
+      const puedeEditar = permiso === 'edit' || esAdmin;
+      return `<div class="d-flex align-items-center gap-2 mb-1 small">
+        <span class="text-nowrap fw-semibold">${etiquetasModulos[modulo]}</span>
+        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" data-user-module-view="${usuario.id}" data-module="${modulo}" ${puedeVer ? 'checked' : ''} ${esAdmin ? 'disabled' : ''}> Ver</label>
+        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" data-user-module-edit="${usuario.id}" data-module="${modulo}" ${puedeEditar ? 'checked' : ''} ${esAdmin || !puedeVer ? 'disabled' : ''}> Editar</label>
+      </div>`;
+    }).join('');
     row.innerHTML = `
       <td><input type="checkbox" class="usuario-checkbox" value="${usuario.id}"></td>
       <td><strong>${usuario.id ? usuario.id.slice(0, 8) : '-'}</strong></td>
@@ -636,6 +658,7 @@ async function cargarUsuariosRoles() {
           <option value="admin" ${usuario.role === 'admin' ? 'selected' : ''}>admin</option>
         </select>
       </td>
+      <td class="text-nowrap">${usuario.role === 'admin' ? '<span class="text-muted small">Acceso total</span>' : permisosModulos}</td>
       <td class="text-end">
         <button class="btn btn-sm btn-primary" data-user-role-save="${usuario.id}" data-role-action="write">Guardar</button>
       </td>
@@ -643,6 +666,23 @@ async function cargarUsuariosRoles() {
 
     const saveButton = row.querySelector('[data-user-role-save]');
     saveButton.addEventListener('click', () => guardarPermisoUsuario(usuario.id));
+
+    row.querySelectorAll('[data-user-module-view]').forEach(input => {
+      input.addEventListener('change', () => {
+        const editInput = row.querySelector(`[data-user-module-edit="${usuario.id}"][data-module="${input.dataset.module}"]`);
+        editInput.disabled = !input.checked;
+        if (!input.checked) editInput.checked = false;
+      });
+    });
+
+    row.querySelectorAll('[data-user-module-edit]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) {
+          row.querySelector(`[data-user-module-view="${usuario.id}"][data-module="${input.dataset.module}"]`).checked = true;
+          row.querySelector(`[data-user-role-select="${usuario.id}"]`).value = 'editor';
+        }
+      });
+    });
 
     tbody.appendChild(row);
   });
@@ -687,7 +727,17 @@ async function guardarPermisoUsuario(userId) {
   if (!selector) return;
 
   const nuevoRol = selector.value;
-  const { error } = await supabaseClient.from('profiles').update({ role: nuevoRol }).eq('id', userId);
+  const modulePermissions = {};
+  if (nuevoRol !== 'admin') {
+    APP_MODULES.forEach(modulo => {
+      const puedeEditar = document.querySelector(`[data-user-module-edit="${userId}"][data-module="${modulo}"]`)?.checked;
+      const puedeVer = document.querySelector(`[data-user-module-view="${userId}"][data-module="${modulo}"]`)?.checked;
+      if (puedeEditar) modulePermissions[modulo] = 'edit';
+      else if (puedeVer) modulePermissions[modulo] = 'view';
+    });
+  }
+
+  const { error } = await supabaseClient.from('profiles').update({ role: nuevoRol, module_permissions: modulePermissions }).eq('id', userId);
 
   if (error) {
     mostrarNotificacion('Error al actualizar el rol: ' + error.message, 'danger');
@@ -696,6 +746,7 @@ async function guardarPermisoUsuario(userId) {
 
   if (userId === (await supabaseClient.auth.getUser()).data.user?.id) {
     currentUserRole = nuevoRol;
+    currentUserModulePermissions = modulePermissions;
     applyRolePermissions();
     toggleAdminOnlySections();
   }

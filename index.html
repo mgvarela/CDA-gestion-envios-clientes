@@ -56,20 +56,25 @@
         <span class="badge bg-light text-dark sidebar-role-label">Rol: <span id="currentUserRoleLabel">viewer</span></span>
       </div>
       <ul class="nav flex-column">
-        <li class="nav-item">
+        <li class="nav-item" data-module="admin">
           <a class="nav-link active" href="#" onclick="navegar('admin', this)">
             <i class="bi bi-pie-chart me-2"></i><span class="sidebar-label">Admin novedades</span>
           </a>
         </li>
-        <li class="nav-item">
+        <li class="nav-item" data-module="envios">
           <a class="nav-link" href="#" onclick="navegar('envios', this)">
             <i class="bi bi-truck me-2"></i><span class="sidebar-label">Envíos y Pedidos</span>
           </a>
         </li>
        
-        <li class="nav-item">
+        <li class="nav-item" data-module="pedidos">
           <a class="nav-link" href="#" onclick="navegar('pedidos', this)">
             <i class="bi bi-box-seam me-2"></i><span class="sidebar-label">Pedidos de Mercadería</span>
+          </a>
+        </li>
+        <li class="nav-item" data-module="facturacion">
+          <a class="nav-link" href="#" onclick="navegar('facturacion', this)">
+            <i class="bi bi-receipt-cutoff me-2"></i><span class="sidebar-label">Facturación</span>
           </a>
         </li>
         <!--<li class="nav-item">
@@ -77,17 +82,17 @@
             <i class="bi bi-star-fill me-2"></i><span class="sidebar-label">Solicitar Reviews</span>
           </a>
         </li>-->
-        <li class="nav-item">
+        <li class="nav-item" data-module="arrepentimiento">
           <a class="nav-link" href="#" onclick="navegar('arrepentimiento', this)">
             <i class="bi bi-arrow-counterclockwise me-2"></i><span class="sidebar-label">Arrepentimiento</span>
           </a>
         </li>
-         <li class="nav-item">
+         <li class="nav-item" data-module="seguimiento">
           <a class="nav-link" href="#" onclick="navegar('seguimiento', this)">
             <i class="bi bi-geo-alt me-2"></i><span class="sidebar-label">Seguimiento</span>
           </a>
         </li>
-        <li class="nav-item">
+        <li class="nav-item" data-module="plantillas">
           <a class="nav-link" href="#" onclick="abrirModalPlantillas(); return false;">
             <i class="bi bi-file-earmark-code me-2"></i><span class="sidebar-label">Plantillas</span>
           </a>
@@ -137,6 +142,7 @@
 <script src="js/auth.js?v=20260922"></script>
 <script src="js/admin.js?v=20260923"></script>
 <script src="js/pedidos.js?v=20260923"></script>
+<script src="js/facturacion.js?v=20260923"></script>
 <script src="js/seguimiento.js?v=20260922"></script>
 <script src="js/arrepentimiento.js?v=20260923"></script>
 </body>

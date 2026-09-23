@@ -64,19 +64,40 @@ El objetivo es concentrar información que normalmente se encuentra distribuida 
 
 Módulo destinado al registro y seguimiento de solicitudes de cancelación o devolución.
 
-Permite registrar:
+Permite:
 
-* Cliente.
-* Pedido.
-* Fecha de solicitud.
-* Motivo.
-* Estado de la gestión.
+* Registrar o importar solicitudes.
+* Asociar automáticamente una plantilla activa según el estado del pedido.
+* Enviar avisos al cliente, a sucursales o a Facturación.
+* Diferenciar el resultado de envío entre `Notificado cliente` y `Notificada Sucursal`.
+* Exportar solicitudes y consultar errores de envío.
 
-Estados:
+Estados iniciales:
 
-`Pendiente` · `En revisión` · `Aprobado`
+`Devuelve Sucursal` · `Aviso Transferencia` · `Reembolso / anulacion Automatica` · `Retiro en domicilio` · `Enviado a Caja`
 
-> La implementación debe adaptarse a las políticas internas y a la normativa vigente aplicable.
+Flujo de devolución en sucursal: al enviar el aviso al cliente desde `Devuelve Sucursal`, el pedido pasa a `Avisar a Sucursal`. Luego de notificar a la sucursal, el pedido queda en `En espera de respuesta`.
+
+Los avisos de transferencia y de reembolso/anulación también pasan a `En espera de respuesta` después de enviar el correo.
+
+### Facturación
+
+El módulo **Facturación** registra `Fecha de compra`, `Tienda`, `ID de compra`, `Pedido`, `Operador`, `Estado` y notas. Los pedidos se cargan en la bandeja principal con estado `Pedido Nuevo` o `Corregir`; desde allí se envían a **En Caja**. Caja puede devolverlos a corrección o informar un número de comprobante único, momento en que pasan a **Facturados**.
+
+Los pedidos facturados se envían al webhook configurado en `GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL` con `hoja_destino: "pedidos_facturados"`. El Apps Script asociado debe usar ese valor para insertar la fila en la pestaña correspondiente de Google Sheets.
+
+### Plantillas de correo
+
+Cada plantilla tiene un `ID interno`, un asunto, cuerpo, módulo y estado opcional. Los selectores muestran el ID interno y cada pantalla solo muestra plantillas de su módulo o del módulo `todos`.
+
+| Módulo | Valor para la plantilla |
+| --- | --- |
+| Arrepentimientos | `arrepentimiento` |
+| Envíos | `envios` |
+| Pedidos de mercadería | `pedidos` |
+| Disponible en todos los módulos | `todos` |
+
+Una plantilla vinculada a un estado de arrepentimiento se utiliza automáticamente al crear o cambiar una solicitud. Si no existe una plantilla específica activa, la aplicación muestra una advertencia y usa la plantilla general del módulo cuando esté disponible.
 
 ---
 
@@ -161,6 +182,9 @@ CREATE TABLE templates (
   id TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,
   cuerpo TEXT NOT NULL,
+  modulo TEXT NOT NULL DEFAULT 'todos',
+  estado TEXT,
+  activo BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
@@ -198,6 +222,14 @@ CREATE TABLE arrepentimientos (
 La migración completa está en `supabase/permissions.sql`. Esta tabla recibe las columnas de la planilla de pedidos, permite importar archivos Excel/CSV desde el módulo **Pedidos de Mercadería** y aplica RLS para que solo usuarios `editor` o `admin` puedan importar datos.
 
 El botón **Exportar stock > 1** descarga un CSV con los registros cuyo `st_depo` sea superior a 1.
+
+### Migraciones
+
+Después de actualizar el proyecto, ejecutá [supabase/permissions.sql](supabase/permissions.sql) en el SQL Editor de Supabase. El script crea o completa las columnas necesarias, configura permisos y migra el estado anterior `Notificado` a `En espera de respuesta` tanto en solicitudes como en plantillas.
+
+### Permisos por módulo
+
+El usuario con rol `admin` ve y administra todos los módulos. En **Admin novedades > Usuarios / Permisos**, el administrador puede asignar a cada usuario `Ver` o `Editar` para Admin, Envíos, Pedidos, Arrepentimiento, Seguimiento y Plantillas. Al marcar `Editar`, el rol se establece en `editor` y también se habilita `Ver`. Los módulos no asignados no aparecen en el menú y sus datos quedan protegidos por RLS.
 
 ---
 

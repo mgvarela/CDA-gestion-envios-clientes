@@ -21,6 +21,32 @@ alter table public.profiles
   add column if not exists created_at timestamptz default now();
 alter table public.profiles
   add column if not exists updated_at timestamptz default now();
+alter table public.profiles
+  add column if not exists module_permissions jsonb;
+
+-- Conserva el acceso actual de los usuarios existentes. Los usuarios nuevos quedan
+-- sin módulos hasta que un administrador les asigne permisos desde la aplicación.
+update public.profiles
+set module_permissions = case role
+  when 'admin' then '{}'::jsonb
+  when 'editor' then '{"admin":"edit","envios":"edit","pedidos":"edit","facturacion":"edit","arrepentimiento":"edit","seguimiento":"view","plantillas":"edit"}'::jsonb
+  else '{"admin":"view","envios":"view","pedidos":"view","facturacion":"view","arrepentimiento":"view","seguimiento":"view","plantillas":"view"}'::jsonb
+end
+where module_permissions is null;
+
+update public.profiles
+set module_permissions = jsonb_set(
+  module_permissions,
+  '{facturacion}',
+  case when role = 'editor' then '"edit"'::jsonb else '"view"'::jsonb end,
+  true
+)
+where role <> 'admin' and not module_permissions ? 'facturacion';
+
+alter table public.profiles
+  alter column module_permissions set default '{}'::jsonb;
+alter table public.profiles
+  alter column module_permissions set not null;
 
 update public.profiles p
 set email = u.email
@@ -156,6 +182,36 @@ $$;
 revoke all on function public.current_user_role() from public;
 grant execute on function public.current_user_role() to authenticated;
 
+create or replace function public.can_access_module(module_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_user_role() = 'admin'
+    or coalesce((select module_permissions ->> module_name from public.profiles where id = auth.uid()), '') in ('view', 'edit');
+$$;
+
+create or replace function public.can_edit_module(module_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_user_role() = 'admin'
+    or (
+      public.current_user_role() = 'editor'
+      and coalesce((select module_permissions ->> module_name from public.profiles where id = auth.uid()), '') = 'edit'
+    );
+$$;
+
+revoke all on function public.can_access_module(text) from public;
+revoke all on function public.can_edit_module(text) from public;
+grant execute on function public.can_access_module(text) to authenticated;
+grant execute on function public.can_edit_module(text) to authenticated;
+
 -- Crea automaticamente un perfil viewer cuando se registra un usuario.
 create or replace function public.handle_new_user()
 returns trigger
@@ -237,68 +293,73 @@ alter table public.arrepentimientos enable row level security;
 
 -- Lectura
 drop policy if exists clientes_select_authenticated on public.clientes;
-create policy clientes_select_authenticated on public.clientes for select to authenticated using (true);
+create policy clientes_select_authenticated on public.clientes for select to authenticated using (public.can_access_module('envios'));
 
 drop policy if exists templates_select_authenticated on public.templates;
-create policy templates_select_authenticated on public.templates for select to authenticated using (true);
+create policy templates_select_authenticated on public.templates for select to authenticated using (
+  public.can_access_module('plantillas')
+  or (modulo in ('todos', 'envios') and public.can_access_module('envios'))
+  or (modulo in ('todos', 'pedidos') and public.can_access_module('pedidos'))
+  or (modulo in ('todos', 'arrepentimiento') and public.can_access_module('arrepentimiento'))
+);
 
 drop policy if exists admin_promos_select_authenticated on public.admin_promos;
-create policy admin_promos_select_authenticated on public.admin_promos for select to authenticated using (true);
+create policy admin_promos_select_authenticated on public.admin_promos for select to authenticated using (public.can_access_module('admin'));
 
 drop policy if exists admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias for select to authenticated using (true);
+create policy admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias for select to authenticated using (public.can_access_module('admin'));
 
 drop policy if exists admin_novedades_select_authenticated on public.admin_novedades;
-create policy admin_novedades_select_authenticated on public.admin_novedades for select to authenticated using (true);
+create policy admin_novedades_select_authenticated on public.admin_novedades for select to authenticated using (public.can_access_module('admin'));
 
 drop policy if exists pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia for select to authenticated using (true);
+create policy pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia for select to authenticated using (public.can_access_module('pedidos'));
 
 drop policy if exists arrepentimientos_select_authenticated on public.arrepentimientos;
-create policy arrepentimientos_select_authenticated on public.arrepentimientos for select to authenticated using (true);
+create policy arrepentimientos_select_authenticated on public.arrepentimientos for select to authenticated using (public.can_access_module('arrepentimiento'));
 
 -- Escritura: editor y admin
 drop policy if exists clientes_insert_editor_admin on public.clientes;
-create policy clientes_insert_editor_admin on public.clientes for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy clientes_insert_editor_admin on public.clientes for insert to authenticated with check (public.can_edit_module('envios'));
 
 drop policy if exists clientes_update_editor_admin on public.clientes;
-create policy clientes_update_editor_admin on public.clientes for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy clientes_update_editor_admin on public.clientes for update to authenticated using (public.can_edit_module('envios')) with check (public.can_edit_module('envios'));
 
 drop policy if exists templates_insert_editor_admin on public.templates;
-create policy templates_insert_editor_admin on public.templates for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy templates_insert_editor_admin on public.templates for insert to authenticated with check (public.can_edit_module('plantillas'));
 
 drop policy if exists templates_update_editor_admin on public.templates;
-create policy templates_update_editor_admin on public.templates for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy templates_update_editor_admin on public.templates for update to authenticated using (public.can_edit_module('plantillas')) with check (public.can_edit_module('plantillas'));
 
 drop policy if exists admin_promos_insert_editor_admin on public.admin_promos;
-create policy admin_promos_insert_editor_admin on public.admin_promos for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_insert_editor_admin on public.admin_promos for insert to authenticated with check (public.can_edit_module('admin'));
 
 drop policy if exists admin_promos_update_editor_admin on public.admin_promos;
-create policy admin_promos_update_editor_admin on public.admin_promos for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_update_editor_admin on public.admin_promos for update to authenticated using (public.can_edit_module('admin')) with check (public.can_edit_module('admin'));
 
 drop policy if exists admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias for insert to authenticated with check (public.can_edit_module('admin'));
 
 drop policy if exists admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias for update to authenticated using (public.can_edit_module('admin')) with check (public.can_edit_module('admin'));
 
 drop policy if exists admin_novedades_insert_editor_admin on public.admin_novedades;
-create policy admin_novedades_insert_editor_admin on public.admin_novedades for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_novedades_insert_editor_admin on public.admin_novedades for insert to authenticated with check (public.can_edit_module('admin'));
 
 drop policy if exists admin_novedades_update_editor_admin on public.admin_novedades;
-create policy admin_novedades_update_editor_admin on public.admin_novedades for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy admin_novedades_update_editor_admin on public.admin_novedades for update to authenticated using (public.can_edit_module('admin')) with check (public.can_edit_module('admin'));
 
 drop policy if exists pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia for insert to authenticated with check (public.can_edit_module('pedidos'));
 
 drop policy if exists pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia for update to authenticated using (public.can_edit_module('pedidos')) with check (public.can_edit_module('pedidos'));
 
 drop policy if exists arrepentimientos_insert_editor_admin on public.arrepentimientos;
-create policy arrepentimientos_insert_editor_admin on public.arrepentimientos for insert to authenticated with check (public.current_user_role() in ('editor', 'admin'));
+create policy arrepentimientos_insert_editor_admin on public.arrepentimientos for insert to authenticated with check (public.can_edit_module('arrepentimiento'));
 
 drop policy if exists arrepentimientos_update_editor_admin on public.arrepentimientos;
-create policy arrepentimientos_update_editor_admin on public.arrepentimientos for update to authenticated using (public.current_user_role() in ('editor', 'admin')) with check (public.current_user_role() in ('editor', 'admin'));
+create policy arrepentimientos_update_editor_admin on public.arrepentimientos for update to authenticated using (public.can_edit_module('arrepentimiento')) with check (public.can_edit_module('arrepentimiento'));
 
 -- Eliminacion: solo admin
 drop policy if exists clientes_delete_admin on public.clientes;
@@ -321,6 +382,81 @@ create policy pedidos_mercaderia_delete_admin on public.pedidos_mercaderia for d
 
 drop policy if exists arrepentimientos_delete_admin on public.arrepentimientos;
 create policy arrepentimientos_delete_admin on public.arrepentimientos for delete to authenticated using (public.current_user_role() = 'admin');
+
+-- Facturación: pedidos, comprobantes y catálogos de carga.
+create table if not exists public.facturacion_pedidos (
+  id uuid primary key default gen_random_uuid(),
+  fecha_compra date not null,
+  tienda text not null,
+  id_compra text,
+  pedido text not null,
+  operador text,
+  estado text not null default 'Pedido Nuevo' check (estado in ('Pedido Nuevo', 'Corregir', 'Facturado')),
+  notas text,
+  en_caja boolean not null default false,
+  numero_comprobante text,
+  fecha_facturacion timestamptz,
+  exportado_sheet boolean not null default false,
+  fecha_exportacion timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.facturacion_tiendas (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null unique,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.facturacion_operadores (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null unique,
+  created_at timestamptz not null default now()
+);
+
+insert into public.facturacion_tiendas (nombre) values
+  ('Provincia Wins'), ('Personal'), ('Shell'), ('Infobae'), ('Nación'), ('Credicoop'), ('Comafi'), ('Macro')
+on conflict (nombre) do nothing;
+
+create unique index if not exists facturacion_numero_comprobante_unico
+on public.facturacion_pedidos (numero_comprobante)
+where numero_comprobante is not null;
+
+alter table public.facturacion_pedidos enable row level security;
+alter table public.facturacion_tiendas enable row level security;
+alter table public.facturacion_operadores enable row level security;
+
+drop policy if exists facturacion_pedidos_select on public.facturacion_pedidos;
+create policy facturacion_pedidos_select on public.facturacion_pedidos
+for select to authenticated using (public.can_access_module('facturacion'));
+
+drop policy if exists facturacion_pedidos_insert on public.facturacion_pedidos;
+create policy facturacion_pedidos_insert on public.facturacion_pedidos
+for insert to authenticated with check (public.can_edit_module('facturacion'));
+
+drop policy if exists facturacion_pedidos_update on public.facturacion_pedidos;
+create policy facturacion_pedidos_update on public.facturacion_pedidos
+for update to authenticated using (public.can_edit_module('facturacion')) with check (public.can_edit_module('facturacion'));
+
+drop policy if exists facturacion_pedidos_delete on public.facturacion_pedidos;
+create policy facturacion_pedidos_delete on public.facturacion_pedidos
+for delete to authenticated using (public.current_user_role() = 'admin');
+
+drop policy if exists facturacion_tiendas_select on public.facturacion_tiendas;
+create policy facturacion_tiendas_select on public.facturacion_tiendas
+for select to authenticated using (public.can_access_module('facturacion'));
+
+drop policy if exists facturacion_tiendas_write on public.facturacion_tiendas;
+create policy facturacion_tiendas_write on public.facturacion_tiendas
+for all to authenticated using (public.can_edit_module('facturacion')) with check (public.can_edit_module('facturacion'));
+
+drop policy if exists facturacion_operadores_select on public.facturacion_operadores;
+create policy facturacion_operadores_select on public.facturacion_operadores
+for select to authenticated using (public.can_access_module('facturacion'));
+
+drop policy if exists facturacion_operadores_write on public.facturacion_operadores;
+create policy facturacion_operadores_write on public.facturacion_operadores
+for all to authenticated using (public.can_edit_module('facturacion')) with check (public.can_edit_module('facturacion'));
 
 -- Refresca updated_at
 create or replace function public.set_profiles_updated_at()
