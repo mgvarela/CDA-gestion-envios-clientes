@@ -138,6 +138,10 @@ alter table public.templates add column if not exists estado text;
 alter table public.templates add column if not exists es_contenido_app boolean not null default true;
 alter table public.templates add column if not exists activo boolean not null default true;
 
+-- Reemplaza el estado operativo anterior por el nuevo estado de espera.
+update public.arrepentimientos set estado = 'En espera de respuesta' where estado = 'Notificado';
+update public.templates set estado = 'En espera de respuesta' where estado = 'Notificado';
+
 -- La funcion evita consultar profiles desde una policy de profiles y caer en recursion.
 create or replace function public.current_user_role()
 returns text
