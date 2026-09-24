@@ -1,817 +1,600 @@
--- Control Hub - perfiles y permisos RLS
--- Ejecutar en Supabase > SQL Editor.
--- Cambiar el email del bloque de bootstrap por el usuario administrador real.
+-- =======================================================
+-- ÍNDICE DE FUNCIONES SQL (PUBLIC)
+-- 1. can_access_module(text)
+-- 2. can_edit_module(text)
+-- 3. current_user_role()
+-- 4. desactivar_promos_vencidas()
+-- 5. handle_new_user()
+-- 6. log_app_table_change()
+-- 7. purgar_app_logs_antiguos()
+-- 8. set_profiles_updated_at()
+-- =======================================================
 
-create extension if not exists pgcrypto;
+-- =======================================================
+-- 1. EXTENSIONES
+-- =======================================================
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  email text not null,
-  role text not null default 'viewer' check (role in ('viewer', 'editor', 'admin')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+-- =======================================================
+-- 2. ESTRUCTURA DE TABLAS PRINCIPALES
+-- =======================================================
+
+-- Profiles (Gestión de usuarios y roles)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('viewer', 'editor', 'admin')),
+  module_permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Compatibilidad con una tabla profiles creada anteriormente.
-alter table public.profiles
-  add column if not exists email text;
-alter table public.profiles
-  add column if not exists role text default 'viewer';
-alter table public.profiles
-  add column if not exists created_at timestamptz default now();
-alter table public.profiles
-  add column if not exists updated_at timestamptz default now();
-alter table public.profiles
-  add column if not exists module_permissions jsonb;
-
--- Conserva el acceso actual de los usuarios existentes. Los usuarios nuevos quedan
--- sin módulos hasta que un administrador les asigne permisos desde la aplicación.
-update public.profiles
-set module_permissions = case role
-  when 'admin' then '{}'::jsonb
-  when 'editor' then '{"admin":"edit","envios":"edit","pedidos":"edit","facturacion":"edit","arrepentimiento":"edit","seguimiento":"view","plantillas":"edit"}'::jsonb
-  else '{"admin":"view","envios":"view","pedidos":"view","facturacion":"view","arrepentimiento":"view","seguimiento":"view","plantillas":"view"}'::jsonb
-end
-where module_permissions is null;
-
-update public.profiles
-set module_permissions = jsonb_set(
-  module_permissions,
-  '{facturacion}',
-  case when role = 'editor' then '"edit"'::jsonb else '"view"'::jsonb end,
-  true
-)
-where role <> 'admin' and not module_permissions ? 'facturacion';
-
-alter table public.profiles
-  alter column module_permissions set default '{}'::jsonb;
-alter table public.profiles
-  alter column module_permissions set not null;
-
-update public.profiles p
-set email = u.email
-from auth.users u
-where p.id = u.id and p.email is null;
-
-update public.profiles
-set role = 'viewer'
-where role is null;
-
-update public.profiles
-set updated_at = now()
-where updated_at is null;
-
-alter table public.profiles enable row level security;
-
--- Pedidos de mercaderia importados desde Excel o CSV.
-create table if not exists public.pedidos_mercaderia (
-  id uuid primary key default gen_random_uuid(),
-  fila_origen integer,
-  cod_suc_vta text,
-  sucursal_vta text,
-  documento text,
-  fecha_venta text,
-  fecha_programada text,
-  clave text,
-  familia text,
-  articulo text,
-  cantidad numeric default 0,
-  st_disponible numeric default 0,
-  st_reservado numeric default 0,
-  cod_suc_ent text,
-  sucursal_ent text,
-  cod_cliente text,
-  cliente text,
-  confirmo text,
-  actualizado text,
-  st_depo numeric default 0,
-  emails_destino text,
-  desde_hasta text,
-  tipo_plantilla text default 'pedido_mercaderia',
-  template_id text,
-  estado text not null default 'pendiente',
-  fecha_envio timestamptz,
-  created_at timestamptz not null default now()
+-- Clientes (Envíos)
+CREATE TABLE IF NOT EXISTS public.clientes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL,
+  pedido TEXT,
+  mail TEXT NOT NULL,
+  template_id TEXT,
+  estado TEXT DEFAULT 'sin aviso',
+  fecha_envio TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tabla de Solicitudes de Arrepentimiento
-create table if not exists public.arrepentimientos (
-  id uuid primary key default gen_random_uuid(),
-  fecha timestamptz default now(),
-  cliente_nombre text,
-  cliente_dni text,
-  cliente_telefono text,
-  cliente_email text,
-  cliente_mail text,
-  pedido_id text,
-  numero_pedido text,
-  pedido text,
-  canal text,
-  monto_devolver numeric,
-  motivo text,
-  otro text,
-  sucursal text,
-  template_id text,
-  comentario text,
-  estado text not null default 'pendiente',
-  fecha_envio timestamptz,
-  created_at timestamptz not null default now()
+-- Templates / Plantillas
+CREATE TABLE IF NOT EXISTS public.templates (
+  id TEXT PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  cuerpo TEXT NOT NULL,
+  es_contenido_app BOOLEAN NOT NULL DEFAULT true,
+  modulo TEXT NOT NULL DEFAULT 'todos',
+  estado TEXT,
+  activo BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migraciones y compatibilidad de columnas para arrepentimientos
-alter table public.arrepentimientos alter column cliente_nombre drop not null;
-alter table public.arrepentimientos alter column motivo drop not null;
-alter table if exists public.arrepentimientos alter column cliente_mail drop not null;
-alter table if exists public.arrepentimientos alter column cliente_email drop not null;
-alter table if exists public.arrepentimientos alter column pedido_id drop not null;
-alter table if exists public.arrepentimientos alter column numero_pedido drop not null;
-
-alter table public.arrepentimientos add column if not exists cliente_dni text;
-alter table public.arrepentimientos add column if not exists cliente_telefono text;
-alter table public.arrepentimientos add column if not exists cliente_email text;
-alter table public.arrepentimientos add column if not exists cliente_mail text;
-alter table public.arrepentimientos add column if not exists pedido_id text;
-alter table public.arrepentimientos add column if not exists numero_pedido text;
-alter table public.arrepentimientos add column if not exists pedido text;
-alter table public.arrepentimientos add column if not exists canal text;
-alter table public.arrepentimientos add column if not exists monto_devolver numeric;
-alter table public.arrepentimientos add column if not exists otro text;
-alter table public.arrepentimientos add column if not exists sucursal text;
-alter table public.arrepentimientos add column if not exists template_id text;
-alter table public.arrepentimientos add column if not exists comentario text;
-alter table public.arrepentimientos add column if not exists fecha_envio timestamptz;
-alter table public.arrepentimientos add column if not exists created_at timestamptz default now();
-
-alter table public.pedidos_mercaderia add column if not exists emails_destino text;
-alter table public.pedidos_mercaderia add column if not exists desde_hasta text;
-alter table public.pedidos_mercaderia add column if not exists tipo_plantilla text default 'pedido_mercaderia';
-alter table public.pedidos_mercaderia add column if not exists template_id text;
-alter table public.pedidos_mercaderia add column if not exists fecha_envio timestamptz;
-
-create table if not exists public.templates (
-  id text primary key,
-  nombre text not null,
-  cuerpo text not null,
-  es_contenido_app boolean not null default true,
-  modulo text not null default 'todos',
-  estado text,
-  activo boolean not null default true,
-  created_at timestamptz default now()
+-- Pedidos de Mercadería
+CREATE TABLE IF NOT EXISTS public.pedidos_mercaderia (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fila_origen INTEGER,
+  cod_suc_vta TEXT,
+  sucursal_vta TEXT,
+  documento TEXT,
+  fecha_venta TEXT,
+  fecha_programada TEXT,
+  clave TEXT,
+  familia TEXT,
+  articulo TEXT,
+  cantidad NUMERIC DEFAULT 0,
+  st_disponible NUMERIC DEFAULT 0,
+  st_reservado NUMERIC DEFAULT 0,
+  cod_suc_ent TEXT,
+  sucursal_ent TEXT,
+  cod_cliente TEXT,
+  cliente TEXT,
+  confirmo TEXT,
+  actualizado TEXT,
+  st_depo NUMERIC DEFAULT 0,
+  emails_destino TEXT,
+  desde_hasta TEXT,
+  tipo_plantilla TEXT DEFAULT 'pedido_mercaderia',
+  template_id TEXT,
+  estado TEXT NOT NULL DEFAULT 'pendiente',
+  fecha_envio TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-alter table public.templates add column if not exists modulo text not null default 'todos';
-alter table public.templates add column if not exists estado text;
-alter table public.templates add column if not exists es_contenido_app boolean not null default true;
-alter table public.templates add column if not exists activo boolean not null default true;
+-- Solicitudes de Arrepentimiento
+CREATE TABLE IF NOT EXISTS public.arrepentimientos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fecha TIMESTAMPTZ DEFAULT NOW(),
+  cliente_nombre TEXT,
+  cliente_dni TEXT,
+  cliente_telefono TEXT,
+  cliente_email TEXT,
+  cliente_mail TEXT,
+  pedido_id TEXT,
+  numero_pedido TEXT,
+  pedido TEXT,
+  canal TEXT,
+  monto_devolver NUMERIC,
+  motivo TEXT,
+  otro TEXT,
+  sucursal TEXT,
+  template_id TEXT,
+  comentario TEXT,
+  estado TEXT NOT NULL DEFAULT 'Otros',
+  estado_cliente TEXT DEFAULT 'Pendiente',
+  emails_destino TEXT,
+  check_envio BOOLEAN DEFAULT false,
+  fecha_envio TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- Reemplaza el estado operativo anterior por el nuevo estado de espera.
-update public.arrepentimientos set estado = 'En espera de respuesta' where estado = 'Notificado';
-update public.templates set estado = 'En espera de respuesta' where estado = 'Notificado';
+-- Módulo de Admin: Promociones Web
+CREATE TABLE IF NOT EXISTS public.admin_promos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo TEXT UNIQUE,
+  promo TEXT NOT NULL,
+  inicio TIMESTAMPTZ,
+  fin TIMESTAMPTZ,
+  landing TEXT,
+  observaciones TEXT,
+  canal TEXT DEFAULT 'web',
+  estado TEXT DEFAULT 'Activa',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- La funcion evita consultar profiles desde una policy de profiles y caer en recursion.
-create or replace function public.current_user_role()
-returns text
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select coalesce((select role from public.profiles where id = auth.uid()), 'viewer');
+-- Módulo de Admin: Promociones Bancarias
+CREATE TABLE IF NOT EXISTS public.admin_promos_bancarias (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo TEXT UNIQUE,
+  banco TEXT NOT NULL,
+  descuento TEXT,
+  cuotas TEXT,
+  vigencia_inicio DATE,
+  vigencia_fin DATE,
+  alcance TEXT DEFAULT 'web',
+  activa BOOLEAN DEFAULT true,
+  estado_vigencia TEXT DEFAULT 'ACTIVA',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Módulo de Admin: Novedades Operativas
+CREATE TABLE IF NOT EXISTS public.admin_novedades (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo TEXT UNIQUE,
+  categoria TEXT NOT NULL,
+  descripcion TEXT NOT NULL,
+  activa TEXT DEFAULT 'Si',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Módulo de Facturación
+CREATE TABLE IF NOT EXISTS public.facturacion_pedidos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fecha_compra DATE NOT NULL,
+  tienda TEXT NOT NULL,
+  id_compra TEXT,
+  pedido TEXT NOT NULL,
+  operador TEXT,
+  estado TEXT NOT NULL DEFAULT 'Pedido Nuevo' CHECK (estado IN ('Pedido Nuevo', 'Corregir', 'Pedido Corregido', 'Facturado')),
+  notas TEXT,
+  en_caja BOOLEAN NOT NULL DEFAULT false,
+  numero_comprobante TEXT UNIQUE,
+  fecha_facturacion TIMESTAMPTZ,
+  exportado_sheet BOOLEAN NOT NULL DEFAULT false,
+  fecha_exportacion TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.facturacion_tiendas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.facturacion_operadores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Configuraciones de Sistema (Credenciales y variables globales)
+CREATE TABLE IF NOT EXISTS public.configuraciones_sistema (
+  clave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL,
+  descripcion TEXT,
+  es_secreta BOOLEAN DEFAULT true,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Registro Global de Logs / Auditoría
+CREATE TABLE IF NOT EXISTS public.app_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  modulo TEXT NOT NULL,
+  accion TEXT NOT NULL,
+  referencia TEXT,
+  detalle TEXT,
+  usuario_id UUID,
+  usuario_email TEXT,
+  origen_id UUID UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =======================================================
+-- 3. FUNCIONES AUXILIARES Y DE SEGURIDAD (RPC)
+-- =======================================================
+
+-- Obtiene el rol del usuario actual
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT COALESCE((SELECT role FROM public.profiles WHERE id = auth.uid()), 'viewer');
 $$;
 
-revoke all on function public.current_user_role() from public;
-grant execute on function public.current_user_role() to authenticated;
-
-create or replace function public.can_access_module(module_name text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.current_user_role() = 'admin'
-    or coalesce((select module_permissions ->> module_name from public.profiles where id = auth.uid()), '') in ('view', 'edit');
+-- Validación de permisos de módulos
+CREATE OR REPLACE FUNCTION public.can_access_module(module_name TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT public.current_user_role() = 'admin'
+    OR COALESCE((SELECT module_permissions ->> module_name FROM public.profiles WHERE id = auth.uid()), '') IN ('view', 'edit');
 $$;
 
-create or replace function public.can_edit_module(module_name text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.current_user_role() = 'admin'
-    or (
+CREATE OR REPLACE FUNCTION public.can_edit_module(module_name TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT public.current_user_role() = 'admin'
+    OR (
       public.current_user_role() = 'editor'
-      and coalesce((select module_permissions ->> module_name from public.profiles where id = auth.uid()), '') = 'edit'
+      AND COALESCE((SELECT module_permissions ->> module_name FROM public.profiles WHERE id = auth.uid()), '') = 'edit'
     );
 $$;
 
-revoke all on function public.can_access_module(text) from public;
-revoke all on function public.can_edit_module(text) from public;
-grant execute on function public.can_access_module(text) to authenticated;
-grant execute on function public.can_edit_module(text) to authenticated;
+-- Desactivar promociones vencidas
+CREATE OR REPLACE FUNCTION public.desactivar_promos_vencidas()
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  UPDATE public.admin_promos
+  SET estado = 'Inactiva'
+  WHERE fin IS NOT NULL AND fin < NOW() AND COALESCE(LOWER(estado), '') <> 'inactiva';
 
--- Crea automaticamente un perfil viewer cuando se registra un usuario.
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profiles (id, email, role)
-  values (new.id, new.email, 'viewer')
-  on conflict (id) do nothing;
-  return new;
-end;
+  UPDATE public.admin_promos_bancarias
+  SET estado_vigencia = 'INACTIVA', activa = false
+  WHERE vigencia_fin IS NOT NULL AND vigencia_fin < CURRENT_DATE
+    AND (COALESCE(UPPER(estado_vigencia), '') <> 'INACTIVA' OR activa IS DISTINCT FROM false);
+END;
 $$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute procedure public.handle_new_user();
+-- Purga de logs antiguos (Mayores a 10 días, coincide con el badge "+10 días" del panel)
+CREATE OR REPLACE FUNCTION public.purgar_app_logs_antiguos()
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  DELETE FROM public.app_logs
+  WHERE created_at < NOW() - INTERVAL '10 days';
+END;
+$$;
 
--- Sincroniza usuarios existentes que todavia no tienen perfil.
-insert into public.profiles (id, email, role)
-select id, email, 'viewer'
-from auth.users
-where not exists (
-  select 1 from public.profiles p where p.id = auth.users.id
-)
-on conflict (id) do nothing;
+-- Permisos de ejecución de funciones
+REVOKE ALL ON FUNCTION public.current_user_role() FROM public;
+REVOKE ALL ON FUNCTION public.can_access_module(TEXT) FROM public;
+REVOKE ALL ON FUNCTION public.can_edit_module(TEXT) FROM public;
+REVOKE ALL ON FUNCTION public.desactivar_promos_vencidas() FROM public;
+REVOKE ALL ON FUNCTION public.purgar_app_logs_antiguos() FROM public;
 
--- Bootstrap del administrador principal.
-update public.profiles
-set role = 'admin', updated_at = now()
-where id = (
-  select id from auth.users
-  where lower(email) = lower('varelamatiasgerardo@gmail.com')
-  limit 1
+GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_access_module(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_edit_module(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.desactivar_promos_vencidas() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.purgar_app_logs_antiguos() TO authenticated;
+
+-- =======================================================
+-- 4. TRIGGERS AUTOMÁTICOS
+-- =======================================================
+
+-- Auto-crear perfil cuando se registra un usuario en auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, role)
+  VALUES (new.id, new.email, 'viewer')
+  ON CONFLICT (id) DO NOTHING;
+  RETURN new;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Trigger para refrescar updated_at en Profiles
+CREATE OR REPLACE FUNCTION public.set_profiles_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  new.updated_at = NOW();
+  RETURN new;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_updated_at ON public.profiles;
+CREATE TRIGGER profiles_updated_at 
+BEFORE UPDATE ON public.profiles 
+FOR EACH ROW EXECUTE PROCEDURE public.set_profiles_updated_at();
+
+-- Auditoría automática de cambios en tablas hacia app_logs
+CREATE OR REPLACE FUNCTION public.log_app_table_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  record_reference TEXT;
+BEGIN
+  IF tg_op = 'DELETE' THEN
+    record_reference := COALESCE(to_jsonb(old) ->> 'id', to_jsonb(old) ->> 'clave', 'sin referencia');
+  ELSE
+    record_reference := COALESCE(to_jsonb(new) ->> 'id', to_jsonb(new) ->> 'clave', 'sin referencia');
+  END IF;
+
+  INSERT INTO public.app_logs (modulo, accion, referencia, detalle, usuario_id, usuario_email)
+  VALUES (
+    tg_table_name,
+    tg_op,
+    record_reference,
+    CASE tg_op
+      WHEN 'INSERT' THEN 'Registro creado'
+      WHEN 'UPDATE' THEN 'Registro modificado'
+      ELSE 'Registro eliminado'
+    END,
+    auth.uid(),
+    COALESCE(auth.jwt() ->> 'email', 'sistema')
+  );
+
+  IF tg_op = 'DELETE' THEN RETURN old; END IF;
+  RETURN new;
+END;
+$$;
+
+-- Aplicar Trigger de auditoría a todas las tablas operativas
+DO $$
+DECLARE
+  tbl_name TEXT;
+BEGIN
+  FOREACH tbl_name IN ARRAY ARRAY[
+    'profiles', 'clientes', 'templates', 'admin_promos', 'admin_promos_bancarias',
+    'admin_novedades', 'pedidos_mercaderia', 'arrepentimientos',
+    'facturacion_pedidos', 'facturacion_tiendas', 'facturacion_operadores',
+    'configuraciones_sistema'
+  ] LOOP
+    IF to_regclass('public.' || tbl_name) IS NOT NULL THEN
+      EXECUTE FORMAT('DROP TRIGGER IF EXISTS %I ON public.%I', 'app_audit_' || tbl_name, tbl_name);
+      EXECUTE FORMAT(
+        'CREATE TRIGGER %I AFTER INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.log_app_table_change()',
+        'app_audit_' || tbl_name, tbl_name
+      );
+    END IF;
+  END LOOP;
+END;
+$$;
+
+-- =======================================================
+-- 5. TAREAS PROGRAMADAS (PG_CRON)
+-- =======================================================
+
+-- Reprogramación limpia del job de purga
+SELECT cron.unschedule('purgar-logs-24h') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'purgar-logs-24h'
 );
 
--- Profiles policies
-drop policy if exists profiles_select_own_or_admin on public.profiles;
-create policy profiles_select_own_or_admin
-on public.profiles for select to authenticated
-using (id = auth.uid() or public.current_user_role() = 'admin');
-
-drop policy if exists profiles_update_admin on public.profiles;
-create policy profiles_update_admin
-on public.profiles for update to authenticated
-using (public.current_user_role() = 'admin')
-with check (role in ('viewer', 'editor', 'admin'));
-
-drop policy if exists profiles_insert_none on public.profiles;
-create policy profiles_insert_none
-on public.profiles for insert to authenticated
-with check (false);
-
-drop policy if exists profiles_delete_none on public.profiles;
-create policy profiles_delete_none
-on public.profiles for delete to authenticated
-using (false);
-
--- Agrega created_at a las tablas del dashboard si ya existen sin esa columna.
-create table if not exists public.admin_promos (
-  id uuid primary key default gen_random_uuid(),
-  codigo text unique,
-  promo text not null,
-  inicio timestamptz,
-  fin timestamptz,
-  landing text,
-  observaciones text,
-  canal text default 'web',
-  estado text default 'Activa',
-  created_at timestamptz not null default now()
+SELECT cron.schedule(
+  'purgar-logs-10dias',
+  '0 0 * * *',
+  'SELECT public.purgar_app_logs_antiguos();'
 );
 
-create table if not exists public.admin_promos_bancarias (
-  id uuid primary key default gen_random_uuid(),
-  codigo text unique,
-  banco text not null,
-  descuento text,
-  cuotas text,
-  vigencia_inicio date,
-  vigencia_fin date,
-  alcance text default 'web',
-  activa boolean default true,
-  estado_vigencia text default 'ACTIVA',
-  created_at timestamptz not null default now()
-);
+-- =======================================================
+-- 6. POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY)
+-- =======================================================
 
-create table if not exists public.admin_novedades (
-  id uuid primary key default gen_random_uuid(),
-  codigo text unique,
-  categoria text not null,
-  descripcion text not null,
-  activa text default 'Si',
-  created_at timestamptz not null default now()
-);
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pedidos_mercaderia ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.arrepentimientos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_promos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_promos_bancarias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_novedades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facturacion_pedidos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facturacion_tiendas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facturacion_operadores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.configuraciones_sistema ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_logs ENABLE ROW LEVEL SECURITY;
 
-alter table if exists public.admin_promos
-  add column if not exists created_at timestamptz not null default now();
-alter table if exists public.admin_promos
-  add column if not exists promo text;
-alter table if exists public.admin_promos
-  add column if not exists codigo text;
-alter table if exists public.admin_promos
-  add column if not exists inicio timestamptz;
-alter table if exists public.admin_promos
-  add column if not exists fin timestamptz;
-alter table if exists public.admin_promos
-  add column if not exists landing text;
-alter table if exists public.admin_promos
-  add column if not exists observaciones text;
-alter table if exists public.admin_promos
-  add column if not exists canal text default 'web';
-alter table if exists public.admin_promos
-  add column if not exists estado text default 'Activa';
-alter table if exists public.admin_promos_bancarias
-  add column if not exists created_at timestamptz not null default now();
-alter table if exists public.admin_promos_bancarias
-  add column if not exists banco text;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists codigo text;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists descuento text;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists cuotas text;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists vigencia_inicio date;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists vigencia_fin date;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists alcance text default 'web';
-alter table if exists public.admin_promos_bancarias
-  add column if not exists activa boolean default true;
-alter table if exists public.admin_promos_bancarias
-  add column if not exists estado_vigencia text default 'ACTIVA';
-alter table if exists public.admin_promos_bancarias
-  alter column activa drop default;
-alter table if exists public.admin_promos_bancarias
-  alter column activa type boolean using case
-    when lower(coalesce(activa::text, '')) in ('si', 'sí', 'true', '1', 't') then true
-    else false
-  end;
-alter table if exists public.admin_promos_bancarias
-  alter column activa set default true;
-alter table if exists public.admin_novedades
-  add column if not exists created_at timestamptz not null default now();
-alter table if exists public.admin_novedades
-  add column if not exists categoria text;
-alter table if exists public.admin_novedades
-  add column if not exists codigo text;
-alter table if exists public.admin_novedades
-  add column if not exists descripcion text;
-alter table if exists public.admin_novedades
-  add column if not exists activa text default 'Si';
+-- Profiles
+DROP POLICY IF EXISTS profiles_select_own_or_admin ON public.profiles;
+CREATE POLICY profiles_select_own_or_admin ON public.profiles FOR SELECT TO authenticated USING (id = auth.uid() OR public.current_user_role() = 'admin');
+DROP POLICY IF EXISTS profiles_update_admin ON public.profiles;
+CREATE POLICY profiles_update_admin ON public.profiles FOR UPDATE TO authenticated USING (public.current_user_role() = 'admin') WITH CHECK (role IN ('viewer', 'editor', 'admin'));
 
-create unique index if not exists admin_promos_codigo_unique
-  on public.admin_promos (codigo)
-  where codigo is not null;
-create unique index if not exists admin_promos_bancarias_codigo_unique
-  on public.admin_promos_bancarias (codigo)
-  where codigo is not null;
-create unique index if not exists admin_novedades_codigo_unique
-  on public.admin_novedades (codigo)
-  where codigo is not null;
+-- Clientes
+DROP POLICY IF EXISTS clientes_select_authenticated ON public.clientes;
+CREATE POLICY clientes_select_authenticated ON public.clientes FOR SELECT TO authenticated USING (public.can_access_module('envios'));
+DROP POLICY IF EXISTS clientes_insert_editor_admin ON public.clientes;
+CREATE POLICY clientes_insert_editor_admin ON public.clientes FOR INSERT TO authenticated WITH CHECK (public.can_edit_module('envios'));
+DROP POLICY IF EXISTS clientes_update_editor_admin ON public.clientes;
+CREATE POLICY clientes_update_editor_admin ON public.clientes FOR UPDATE TO authenticated USING (public.can_edit_module('envios')) WITH CHECK (public.can_edit_module('envios'));
+DROP POLICY IF EXISTS clientes_delete_admin ON public.clientes;
+CREATE POLICY clientes_delete_admin ON public.clientes FOR DELETE TO authenticated USING (public.current_user_role() = 'admin');
 
--- Tabla de clientes del módulo de Envíos (puede faltar en proyectos nuevos).
-create table if not exists public.clientes (
-  id uuid default gen_random_uuid() primary key,
-  nombre text not null,
-  pedido text,
-  mail text not null,
-  template_id text,
-  estado text default 'sin aviso',
-  fecha_envio timestamptz,
-  created_at timestamptz default now()
-);
-
-alter table public.clientes
-  add column if not exists fecha_envio timestamptz;
-
--- Activa RLS en todas las tablas usadas por la aplicacion.
-alter table if exists public.clientes enable row level security;
-alter table if exists public.templates enable row level security;
-alter table if exists public.admin_promos enable row level security;
-alter table if exists public.admin_promos_bancarias enable row level security;
-alter table if exists public.admin_novedades enable row level security;
-alter table public.pedidos_mercaderia enable row level security;
-alter table public.arrepentimientos enable row level security;
-
--- Lectura
-drop policy if exists clientes_select_authenticated on public.clientes;
-create policy clientes_select_authenticated on public.clientes for select to authenticated using (public.can_access_module('envios'));
-
-drop policy if exists templates_select_authenticated on public.templates;
-create policy templates_select_authenticated on public.templates for select to authenticated using (
+-- Templates
+DROP POLICY IF EXISTS templates_select_authenticated ON public.templates;
+CREATE POLICY templates_select_authenticated ON public.templates FOR SELECT TO authenticated USING (
   public.can_access_module('plantillas')
-  or (modulo in ('todos', 'envios') and public.can_access_module('envios'))
-  or (modulo in ('todos', 'pedidos') and public.can_access_module('pedidos'))
-  or (modulo in ('todos', 'arrepentimiento') and public.can_access_module('arrepentimiento'))
+  OR (modulo IN ('todos', 'envios') AND public.can_access_module('envios'))
+  OR (modulo IN ('todos', 'pedidos') AND public.can_access_module('pedidos'))
+  OR (modulo IN ('todos', 'arrepentimiento') AND public.can_access_module('arrepentimiento'))
+);
+DROP POLICY IF EXISTS templates_insert_editor_admin ON public.templates;
+CREATE POLICY templates_insert_editor_admin ON public.templates FOR INSERT TO authenticated WITH CHECK (public.can_edit_module('plantillas'));
+DROP POLICY IF EXISTS templates_update_editor_admin ON public.templates;
+CREATE POLICY templates_update_editor_admin ON public.templates FOR UPDATE TO authenticated USING (public.can_edit_module('plantillas')) WITH CHECK (public.can_edit_module('plantillas'));
+DROP POLICY IF EXISTS templates_delete_admin ON public.templates;
+CREATE POLICY templates_delete_admin ON public.templates FOR DELETE TO authenticated USING (public.current_user_role() = 'admin');
+
+-- Arrepentimientos
+DROP POLICY IF EXISTS arrepentimientos_select_authenticated ON public.arrepentimientos;
+CREATE POLICY arrepentimientos_select_authenticated ON public.arrepentimientos FOR SELECT TO authenticated USING (public.can_access_module('arrepentimiento'));
+DROP POLICY IF EXISTS arrepentimientos_insert_editor_admin ON public.arrepentimientos;
+CREATE POLICY arrepentimientos_insert_editor_admin ON public.arrepentimientos FOR INSERT TO authenticated WITH CHECK (public.can_edit_module('arrepentimiento'));
+DROP POLICY IF EXISTS arrepentimientos_insert_formulario_publico ON public.arrepentimientos;
+CREATE POLICY arrepentimientos_insert_formulario_publico ON public.arrepentimientos FOR INSERT TO anon WITH CHECK (estado = 'Otros' AND canal = 'web');
+DROP POLICY IF EXISTS arrepentimientos_update_editor_admin ON public.arrepentimientos;
+CREATE POLICY arrepentimientos_update_editor_admin ON public.arrepentimientos FOR UPDATE TO authenticated USING (public.can_edit_module('arrepentimiento')) WITH CHECK (public.can_edit_module('arrepentimiento'));
+DROP POLICY IF EXISTS arrepentimientos_delete_admin ON public.arrepentimientos;
+CREATE POLICY arrepentimientos_delete_admin ON public.arrepentimientos FOR DELETE TO authenticated USING (public.current_user_role() = 'admin');
+
+-- Configuraciones Sistema
+DROP POLICY IF EXISTS configuraciones_select_admin ON public.configuraciones_sistema;
+CREATE POLICY configuraciones_select_admin ON public.configuraciones_sistema FOR SELECT TO authenticated USING (public.current_user_role() = 'admin');
+DROP POLICY IF EXISTS configuraciones_insert_admin ON public.configuraciones_sistema;
+CREATE POLICY configuraciones_insert_admin ON public.configuraciones_sistema FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'admin');
+DROP POLICY IF EXISTS configuraciones_update_admin ON public.configuraciones_sistema;
+CREATE POLICY configuraciones_update_admin ON public.configuraciones_sistema FOR UPDATE TO authenticated USING (public.current_user_role() = 'admin') WITH CHECK (public.current_user_role() = 'admin');
+DROP POLICY IF EXISTS configuraciones_delete_admin ON public.configuraciones_sistema;
+CREATE POLICY configuraciones_delete_admin ON public.configuraciones_sistema FOR DELETE TO authenticated USING (public.current_user_role() = 'admin');
+
+-- App Logs
+DROP POLICY IF EXISTS app_logs_select_admin ON public.app_logs;
+CREATE POLICY app_logs_select_admin ON public.app_logs FOR SELECT TO authenticated USING (public.current_user_role() = 'admin');
+DROP POLICY IF EXISTS app_logs_insert_authenticated ON public.app_logs;
+CREATE POLICY app_logs_insert_authenticated ON public.app_logs FOR INSERT TO authenticated WITH CHECK (auth.uid() = usuario_id OR usuario_id IS NULL);
+
+-- =======================================================
+-- 7. DATOS INICIALES & BOOTSTRAP DE ADMIN
+-- =======================================================
+
+-- Admin Principal
+UPDATE public.profiles
+SET role = 'admin', updated_at = NOW()
+WHERE id = (
+  SELECT id FROM auth.users
+  WHERE LOWER(email) = LOWER('varelamatiasgerardo@gmail.com')
+  LIMIT 1
 );
 
-drop policy if exists admin_promos_select_authenticated on public.admin_promos;
-create policy admin_promos_select_authenticated on public.admin_promos for select to authenticated using (public.can_access_module('admin'));
-
-drop policy if exists admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_select_authenticated on public.admin_promos_bancarias for select to authenticated using (public.can_access_module('admin'));
-
-drop policy if exists admin_novedades_select_authenticated on public.admin_novedades;
-create policy admin_novedades_select_authenticated on public.admin_novedades for select to authenticated using (public.can_access_module('admin'));
-
-drop policy if exists pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_select_authenticated on public.pedidos_mercaderia for select to authenticated using (public.can_access_module('pedidos'));
-
-drop policy if exists arrepentimientos_select_authenticated on public.arrepentimientos;
-create policy arrepentimientos_select_authenticated on public.arrepentimientos for select to authenticated using (public.can_access_module('arrepentimiento'));
-
--- Escritura: editor y admin
-drop policy if exists clientes_insert_editor_admin on public.clientes;
-create policy clientes_insert_editor_admin on public.clientes for insert to authenticated with check (public.can_edit_module('envios'));
-
-drop policy if exists clientes_update_editor_admin on public.clientes;
-create policy clientes_update_editor_admin on public.clientes for update to authenticated using (public.can_edit_module('envios')) with check (public.can_edit_module('envios'));
-
-drop policy if exists templates_insert_editor_admin on public.templates;
-create policy templates_insert_editor_admin on public.templates for insert to authenticated with check (public.can_edit_module('plantillas'));
-
-drop policy if exists templates_update_editor_admin on public.templates;
-create policy templates_update_editor_admin on public.templates for update to authenticated using (public.can_edit_module('plantillas')) with check (public.can_edit_module('plantillas'));
-
-drop policy if exists admin_promos_insert_editor_admin on public.admin_promos;
-create policy admin_promos_insert_editor_admin on public.admin_promos for insert to authenticated with check (public.can_edit_module('admin'));
-
-drop policy if exists admin_promos_update_editor_admin on public.admin_promos;
-create policy admin_promos_update_editor_admin on public.admin_promos for update to authenticated using (public.can_edit_module('admin')) with check (public.can_edit_module('admin'));
-
-drop policy if exists admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_insert_editor_admin on public.admin_promos_bancarias for insert to authenticated with check (public.can_edit_module('admin'));
-
-drop policy if exists admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_update_editor_admin on public.admin_promos_bancarias for update to authenticated using (public.can_edit_module('admin')) with check (public.can_edit_module('admin'));
-
-drop policy if exists admin_novedades_insert_editor_admin on public.admin_novedades;
-create policy admin_novedades_insert_editor_admin on public.admin_novedades for insert to authenticated with check (public.can_edit_module('admin'));
-
-drop policy if exists admin_novedades_update_editor_admin on public.admin_novedades;
-create policy admin_novedades_update_editor_admin on public.admin_novedades for update to authenticated using (public.can_edit_module('admin')) with check (public.can_edit_module('admin'));
-
-drop policy if exists pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_insert_editor_admin on public.pedidos_mercaderia for insert to authenticated with check (public.can_edit_module('pedidos'));
-
-drop policy if exists pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_update_editor_admin on public.pedidos_mercaderia for update to authenticated using (public.can_edit_module('pedidos')) with check (public.can_edit_module('pedidos'));
-
-drop policy if exists arrepentimientos_insert_editor_admin on public.arrepentimientos;
-create policy arrepentimientos_insert_editor_admin on public.arrepentimientos for insert to authenticated with check (public.can_edit_module('arrepentimiento'));
-
-drop policy if exists arrepentimientos_update_editor_admin on public.arrepentimientos;
-create policy arrepentimientos_update_editor_admin on public.arrepentimientos for update to authenticated using (public.can_edit_module('arrepentimiento')) with check (public.can_edit_module('arrepentimiento'));
-
--- Eliminacion: solo admin
-drop policy if exists clientes_delete_admin on public.clientes;
-create policy clientes_delete_admin on public.clientes for delete to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists templates_delete_admin on public.templates;
-create policy templates_delete_admin on public.templates for delete to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists admin_promos_delete_admin on public.admin_promos;
-create policy admin_promos_delete_admin on public.admin_promos for delete to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists admin_promos_bancarias_delete_admin on public.admin_promos_bancarias;
-create policy admin_promos_bancarias_delete_admin on public.admin_promos_bancarias for delete to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists admin_novedades_delete_admin on public.admin_novedades;
-create policy admin_novedades_delete_admin on public.admin_novedades for delete to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists pedidos_mercaderia_delete_admin on public.pedidos_mercaderia;
-create policy pedidos_mercaderia_delete_admin on public.pedidos_mercaderia for delete to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists arrepentimientos_delete_admin on public.arrepentimientos;
-create policy arrepentimientos_delete_admin on public.arrepentimientos for delete to authenticated using (public.current_user_role() = 'admin');
-
--- Facturación: pedidos, comprobantes y catálogos de carga.
-create table if not exists public.facturacion_pedidos (
-  id uuid primary key default gen_random_uuid(),
-  fecha_compra date not null,
-  tienda text not null,
-  id_compra text,
-  pedido text not null,
-  operador text,
-  estado text not null default 'Pedido Nuevo' check (estado in ('Pedido Nuevo', 'Corregir', 'Facturado')),
-  notas text,
-  en_caja boolean not null default false,
-  numero_comprobante text,
-  fecha_facturacion timestamptz,
-  exportado_sheet boolean not null default false,
-  fecha_exportacion timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.facturacion_pedidos
-  drop constraint if exists facturacion_pedidos_estado_check;
-alter table public.facturacion_pedidos
-  add constraint facturacion_pedidos_estado_check
-  check (estado in ('Pedido Nuevo', 'Corregir', 'Pedido Corregido', 'Facturado'));
-
-create table if not exists public.facturacion_tiendas (
-  id uuid primary key default gen_random_uuid(),
-  nombre text not null unique,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.facturacion_operadores (
-  id uuid primary key default gen_random_uuid(),
-  nombre text not null unique,
-  created_at timestamptz not null default now()
-);
-
-insert into public.facturacion_tiendas (nombre) values
+-- Catalogos iniciales de facturación
+INSERT INTO public.facturacion_tiendas (nombre) VALUES
   ('Provincia Wins'), ('Personal'), ('Shell'), ('Infobae'), ('Nación'), ('Credicoop'), ('Comafi'), ('Macro')
-on conflict (nombre) do nothing;
+ON CONFLICT (nombre) DO NOTHING;
 
-create unique index if not exists facturacion_numero_comprobante_unico
-on public.facturacion_pedidos (numero_comprobante)
-where numero_comprobante is not null;
-
-alter table public.facturacion_pedidos enable row level security;
-alter table public.facturacion_tiendas enable row level security;
-alter table public.facturacion_operadores enable row level security;
-
-drop policy if exists facturacion_pedidos_select on public.facturacion_pedidos;
-create policy facturacion_pedidos_select on public.facturacion_pedidos
-for select to authenticated using (public.can_access_module('facturacion'));
-
-drop policy if exists facturacion_pedidos_insert on public.facturacion_pedidos;
-create policy facturacion_pedidos_insert on public.facturacion_pedidos
-for insert to authenticated with check (public.can_edit_module('facturacion'));
-
-drop policy if exists facturacion_pedidos_update on public.facturacion_pedidos;
-create policy facturacion_pedidos_update on public.facturacion_pedidos
-for update to authenticated using (public.can_edit_module('facturacion')) with check (public.can_edit_module('facturacion'));
-
-drop policy if exists facturacion_pedidos_delete on public.facturacion_pedidos;
-create policy facturacion_pedidos_delete on public.facturacion_pedidos
-for delete to authenticated using (public.can_edit_module('facturacion'));
-
-drop policy if exists facturacion_tiendas_select on public.facturacion_tiendas;
-create policy facturacion_tiendas_select on public.facturacion_tiendas
-for select to authenticated using (public.can_access_module('facturacion'));
-
-drop policy if exists facturacion_tiendas_write on public.facturacion_tiendas;
-create policy facturacion_tiendas_write on public.facturacion_tiendas
-for all to authenticated using (public.can_edit_module('facturacion')) with check (public.can_edit_module('facturacion'));
-
-drop policy if exists facturacion_operadores_select on public.facturacion_operadores;
-create policy facturacion_operadores_select on public.facturacion_operadores
-for select to authenticated using (public.can_access_module('facturacion'));
-
-drop policy if exists facturacion_operadores_write on public.facturacion_operadores;
-create policy facturacion_operadores_write on public.facturacion_operadores
-for all to authenticated using (public.can_edit_module('facturacion')) with check (public.can_edit_module('facturacion'));
-
--- Refresca updated_at
-create or replace function public.set_profiles_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-drop trigger if exists profiles_updated_at on public.profiles;
-create trigger profiles_updated_at before update on public.profiles for each row execute procedure public.set_profiles_updated_at();
-
--- Refrescar cache de esquemas
-notify pgrst, 'reload schema';
-
-
--- 1. Tabla principal de Arrepentimientos consolidada
-create table if not exists public.arrepentimientos (
-  id uuid primary key default gen_random_uuid(),
-  fecha timestamptz default now(),
-  cliente_nombre text,
-  cliente_dni text,
-  cliente_telefono text,
-  cliente_email text,
-  cliente_mail text,
-  pedido_id text,
-  numero_pedido text,
-  pedido text,
-  canal text,
-  monto_devolver numeric,
-  motivo text,
-  otro text,
-  template_id text,
-  comentario text,
-  estado text not null default 'Enviado a Caja',
-  estado_cliente text default 'Pendiente',
-  emails_destino text,
-  check_envio boolean default false,
-  fecha_envio timestamptz,
-  created_at timestamptz not null default now()
-);
-
--- Migraciones sin romper datos
-alter table public.arrepentimientos add column if not exists estado_cliente text default 'Pendiente';
-alter table public.arrepentimientos add column if not exists emails_destino text;
-alter table public.arrepentimientos add column if not exists check_envio boolean default false;
-alter table public.arrepentimientos add column if not exists canal text;
-alter table public.arrepentimientos add column if not exists monto_devolver numeric;
-alter table public.arrepentimientos add column if not exists otro text;
-alter table public.arrepentimientos add column if not exists template_id text;
-alter table public.arrepentimientos add column if not exists comentario text;
-
--- 2. Tabla de Logs de Errores
-create table if not exists public.arrepentimientos_logs (
-  id uuid primary key default gen_random_uuid(),
-  fecha timestamptz default now(),
-  mensaje_error text not null,
-  referencia_fila text,
-  usuario_email text,
-  created_at timestamptz default now()
-);
-
-alter table public.arrepentimientos enable row level security;
-alter table public.arrepentimientos_logs enable row level security;
-
--- Politicas RLS
-drop policy if exists arrepentimientos_logs_select_admin on public.arrepentimientos_logs;
-create policy arrepentimientos_logs_select_admin on public.arrepentimientos_logs
-for select to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists arrepentimientos_logs_insert_authenticated on public.arrepentimientos_logs;
-create policy arrepentimientos_logs_insert_authenticated on public.arrepentimientos_logs
-for insert to authenticated with check (true);
-
--- 3. Tabla de Configuraciones del Sistema y Credenciales Sensibles (Solo Admin)
-create table if not exists public.configuraciones_sistema (
-  clave text primary key,
-  valor text not null,
-  descripcion text,
-  es_secreta boolean default true,
-  updated_at timestamptz default now()
-);
-
-alter table public.configuraciones_sistema enable row level security;
-
--- Políticas RLS: Exclusivas para el rol 'admin'
-drop policy if exists configuraciones_select_admin on public.configuraciones_sistema;
-create policy configuraciones_select_admin on public.configuraciones_sistema
-for select to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists configuraciones_insert_admin on public.configuraciones_sistema;
-create policy configuraciones_insert_admin on public.configuraciones_sistema
-for insert to authenticated with check (public.current_user_role() = 'admin');
-
-drop policy if exists configuraciones_update_admin on public.configuraciones_sistema;
-create policy configuraciones_update_admin on public.configuraciones_sistema
-for update to authenticated using (public.current_user_role() = 'admin') with check (public.current_user_role() = 'admin');
-
-drop policy if exists configuraciones_delete_admin on public.configuraciones_sistema;
-create policy configuraciones_delete_admin on public.configuraciones_sistema
-for delete to authenticated using (public.current_user_role() = 'admin');
-
--- Valores iniciales del sistema (no sobreescribe valores si ya existen)
-insert into public.configuraciones_sistema (clave, valor, descripcion, es_secreta) values
+-- Configuraciones base
+INSERT INTO public.configuraciones_sistema (clave, valor, descripcion, es_secreta) VALUES
   ('DISPATCHTRACK_API_KEY', '', 'API Key de DispatchTrack para seguimiento logístico', true),
   ('EPRESIS_API_KEY', '', 'API Key de Epresis para seguimiento', true),
   ('MERCADO_FLEX_TOKEN', '', 'Token de autorización OAuth de Mercado Envíos Flex', true),
   ('DESTINATARIO_FACTURACION', 'mvarela@casadelaudio.com', 'Email destinatario para avisos de facturación y caja', false),
   ('EMAIL_ADMIN_GRUPO', 'info---ecommerce@googlegroups.com', 'Email grupal para alertas de cambios operativos y promociones', false),
   ('GOOGLE_SHEET_ARCHIVE_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbyOHK_tiJJgVY9HffudGWQuyfCIIld70VpFg7d4EonvYe2dbOm30p8CAqm9rczkQv9R/exec', 'Webhook URL de Google Apps Script para archivado de arrepentimientos', true)
-on conflict (clave) do nothing;
+ON CONFLICT (clave) DO NOTHING;
 
-notify pgrst, 'reload schema';
 
--- Registro global de actividad y auditoría de cambios operativos.
-create table if not exists public.app_logs (
-  id uuid primary key default gen_random_uuid(),
-  modulo text not null,
-  accion text not null,
-  referencia text,
-  detalle text,
-  usuario_id uuid,
-  usuario_email text,
-  origen_id uuid unique,
-  created_at timestamptz not null default now()
+-- =======================================================
+-- TAREAS PROGRAMADAS (PG_CRON)
+-- =======================================================
+
+-- 1. Desactivación diaria de promociones vencidas
+CREATE OR REPLACE FUNCTION public.desactivar_promos_vencidas()
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  UPDATE public.admin_promos
+  SET estado = 'Inactiva'
+  WHERE fin IS NOT NULL 
+    AND fin < NOW() 
+    AND COALESCE(LOWER(estado), '') <> 'inactiva';
+
+  UPDATE public.admin_promos_bancarias
+  SET estado_vigencia = 'INACTIVA', activa = false
+  WHERE vigencia_fin IS NOT NULL 
+    AND vigencia_fin < CURRENT_DATE
+    AND (
+      COALESCE(UPPER(estado_vigencia), '') <> 'INACTIVA'
+      OR activa IS DISTINCT FROM false
+    );
+END;
+$$;
+
+SELECT cron.unschedule('desactivar-promos-vencidas-diario') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'desactivar-promos-vencidas-diario'
 );
 
-alter table public.app_logs enable row level security;
+SELECT cron.schedule(
+  'desactivar-promos-vencidas-diario',
+  '0 0 * * *',
+  'SELECT public.desactivar_promos_vencidas();'
+);
 
-drop policy if exists app_logs_select_admin on public.app_logs;
-create policy app_logs_select_admin on public.app_logs
-for select to authenticated using (public.current_user_role() = 'admin');
-
-drop policy if exists app_logs_insert_authenticated on public.app_logs;
-create policy app_logs_insert_authenticated on public.app_logs
-for insert to authenticated with check (auth.uid() = usuario_id or usuario_id is null);
-
-create or replace function public.log_app_table_change()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  record_reference text;
-begin
-  if tg_op = 'DELETE' then
-    record_reference := coalesce(to_jsonb(old) ->> 'id', to_jsonb(old) ->> 'clave', 'sin referencia');
-  else
-    record_reference := coalesce(to_jsonb(new) ->> 'id', to_jsonb(new) ->> 'clave', 'sin referencia');
-  end if;
-
-  insert into public.app_logs (modulo, accion, referencia, detalle, usuario_id, usuario_email)
-  values (
-    tg_table_name,
-    tg_op,
-    record_reference,
-    case tg_op
-      when 'INSERT' then 'Registro creado'
-      when 'UPDATE' then 'Registro modificado'
-      else 'Registro eliminado'
-    end,
-    auth.uid(),
-    coalesce(auth.jwt() ->> 'email', 'sistema')
-  );
-
-  if tg_op = 'DELETE' then
-    return old;
-  end if;
-  return new;
-end;
+-- 2. Mantenimiento semanal y optimización de tablas
+CREATE OR REPLACE FUNCTION public.mantenimiento_optimizar_tablas()
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  EXECUTE 'VACUUM ANALYZE public.app_logs';
+  EXECUTE 'VACUUM ANALYZE public.clientes';
+  EXECUTE 'VACUUM ANALYZE public.arrepentimientos';
+  EXECUTE 'VACUUM ANALYZE public.facturacion_pedidos';
+END;
 $$;
 
-do $$
-declare
-  table_name text;
-begin
-  foreach table_name in array array[
-    'profiles', 'clientes', 'templates', 'admin_promos', 'admin_promos_bancarias',
-    'admin_novedades', 'pedidos_mercaderia', 'arrepentimientos',
-    'facturacion_pedidos', 'facturacion_tiendas', 'facturacion_operadores',
-    'configuraciones_sistema'
-  ] loop
-    if to_regclass('public.' || table_name) is not null then
-      execute format('drop trigger if exists %I on public.%I', 'app_audit_' || table_name, table_name);
-      execute format(
-        'create trigger %I after insert or update or delete on public.%I for each row execute function public.log_app_table_change()',
-        'app_audit_' || table_name,
-        table_name
-      );
-    end if;
-  end loop;
-end;
+-- Solo la ejecuta pg_cron; no debe quedar expuesta como RPC pública.
+REVOKE ALL ON FUNCTION public.mantenimiento_optimizar_tablas() FROM public;
+
+SELECT cron.unschedule('mantenimiento-semanal-vacuum') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'mantenimiento-semanal-vacuum'
+);
+
+SELECT cron.schedule(
+  'mantenimiento-semanal-vacuum',
+  '0 3 * * 0',
+  'SELECT public.mantenimiento_optimizar_tablas();'
+);
+
+-- 3. Marcado de logs obsoletos a los 10 días
+ALTER TABLE public.app_logs 
+  ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';
+
+CREATE OR REPLACE FUNCTION public.marcar_app_logs_obsoletos()
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  UPDATE public.app_logs
+  SET estado = 'obsoleto'
+  WHERE created_at < NOW() - INTERVAL '10 days'
+    AND COALESCE(estado, 'activo') <> 'obsoleto';
+END;
 $$;
 
-do $$
-begin
-  if to_regclass('public.arrepentimientos_logs') is not null then
-    execute $migration$
-      insert into public.app_logs (modulo, accion, referencia, detalle, usuario_email, origen_id, created_at)
-      select 'Arrepentimientos', 'Error', referencia_fila, mensaje_error, usuario_email, id, coalesce(created_at, fecha, now())
-      from public.arrepentimientos_logs
-      on conflict (origen_id) do nothing
-    $migration$;
-  end if;
-end;
-$$;
+-- Solo la ejecuta pg_cron; no debe quedar expuesta como RPC pública.
+REVOKE ALL ON FUNCTION public.marcar_app_logs_obsoletos() FROM public;
 
-notify pgrst, 'reload schema';
+SELECT cron.unschedule('marcar-logs-obsoletos-diario') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'marcar-logs-obsoletos-diario'
+);
 
--- Desactiva promociones vencidas: web por fecha y hora, bancarias al finalizar su fecha de vigencia.
-create or replace function public.desactivar_promos_vencidas()
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  update public.admin_promos
-  set estado = 'Inactiva'
-  where fin is not null
-    and fin < now()
-    and coalesce(lower(estado), '') <> 'inactiva';
+SELECT cron.schedule(
+  'marcar-logs-obsoletos-diario',
+  '0 0 * * *',
+  'SELECT public.marcar_app_logs_obsoletos();'
+);
 
-  update public.admin_promos_bancarias
-  set estado_vigencia = 'INACTIVA', activa = false
-  where vigencia_fin is not null
-    and vigencia_fin < current_date
-    and (
-      coalesce(upper(estado_vigencia), '') <> 'INACTIVA'
-      or activa is distinct from false
-    );
-end;
-$$;
 
-revoke all on function public.desactivar_promos_vencidas() from public;
-grant execute on function public.desactivar_promos_vencidas() to authenticated;
+-- 1. Asegurar campos en las tablas principales
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';
+ALTER TABLE public.admin_promos ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'Activa';
+ALTER TABLE public.arrepentimientos ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'Otros';
+ALTER TABLE public.facturacion_pedidos ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'Pedido Nuevo';
 
-notify pgrst, 'reload schema';
+-- El resaltado de "+10 días sin finalizar" se resuelve en el front-end
+-- comparando created_at (no se modifica ningún estado desde el backend,
+-- para no interferir con los flujos de cierre de cada módulo).
+SELECT cron.unschedule('marcar-obsoletos-todos-modulos') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'marcar-obsoletos-todos-modulos'
+);
+DROP FUNCTION IF EXISTS public.marcar_registros_obsoletos_10dias();
+
+-- Notificar recarga de esquemas
+NOTIFY pgrst, 'reload schema';

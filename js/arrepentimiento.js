@@ -289,7 +289,7 @@ function renderizarArrepentimientos() {
       : opcionesEstado;
 
     return `
-      <tr data-id="${item.id}">
+      <tr data-id="${item.id}" class="${esRegistroObsoleto(item.created_at) ? 'table-warning' : ''}">
         <td class="text-center">
           <input type="checkbox" class="form-check-input chk-arrepentimiento" value="${item.id}">
         </td>

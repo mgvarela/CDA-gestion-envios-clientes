@@ -225,7 +225,7 @@ function renderizarPedidos() {
   }
 
   tbody.innerHTML = visibles.map(pedido => `
-    <tr>
+    <tr class="${esRegistroObsoleto(pedido.created_at) ? 'table-warning' : ''}">
       <td><input type="checkbox" class="pedido-checkbox" value="${pedido.id}"></td>
       <td><strong>${escapeHtml(pedido.cliente || 'Sin nombre')}</strong></td>
       <td>${escapeHtml(pedido.cod_cliente || '-')}</td>

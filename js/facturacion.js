@@ -108,7 +108,8 @@ function renderizarFacturacion() {
       ? `<small>${escapeHtml(item.notas || '-')}</small>`
       : `<textarea class="form-control form-control-sm" rows="2" maxlength="1000" placeholder="Agregar comentario..." onchange="actualizarNotasFacturacion('${item.id}', this.value)">${escapeHtml(item.notas || '')}</textarea>`;
 
-    return `<tr>
+    const esObsoleto = vistaFacturacion !== 'facturados' && esRegistroObsoleto(item.created_at);
+    return `<tr class="${esObsoleto ? 'table-warning' : ''}">
       ${vistaFacturacion === 'facturados' ? `<td class="text-center"><input class="form-check-input chk-facturado" type="checkbox" value="${item.id}" aria-label="Seleccionar pedido ${escapeHtml(item.pedido || '')}"></td>` : '<td hidden></td>'}
       <td>${item.fecha_compra ? new Date(`${item.fecha_compra}T00:00:00`).toLocaleDateString('es-AR') : '-'}</td>
       <td>${escapeHtml(item.tienda || '-')}</td>

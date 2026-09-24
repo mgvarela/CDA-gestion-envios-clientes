@@ -1,8 +1,21 @@
 // =========================================================================
 // CONFIGURACIÓN DE SUPABASE (Paso Entrada)
 // =========================================================================
-const SUPABASE_URL = "https://ievbmsddbydxgnzknavl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s";
+// Cambiá este flag para elegir a qué Supabase apunta el script sin tocar el resto.
+// true = proyecto de pruebas (env.local.js) | false = producción.
+const USAR_SUPABASE_DE_PRUEBA = true;
+
+const SUPABASE_PROD = {
+  url: "https://ievbmsddbydxgnzknavl.supabase.co",
+  anonKey: "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s"
+};
+const SUPABASE_PRUEBA = {
+  url: "https://mcalkzjadiccqfxkyxxp.supabase.co",
+  anonKey: "sb_publishable_2PJktFwxF0GMv7mlG4b3xw_qItzvQUR"
+};
+
+const SUPABASE_URL = USAR_SUPABASE_DE_PRUEBA ? SUPABASE_PRUEBA.url : SUPABASE_PROD.url;
+const SUPABASE_ANON_KEY = USAR_SUPABASE_DE_PRUEBA ? SUPABASE_PRUEBA.anonKey : SUPABASE_PROD.anonKey;
 
 // NOMBRE EXACTO DE LAS PESTAÑAS DENTRO DE TU SHEET
 const NOMBRE_HOJA_FORMULARIO = "Respuestas de Formulario 1";

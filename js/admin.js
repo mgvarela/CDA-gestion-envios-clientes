@@ -60,15 +60,95 @@ function mostrarPanelLogs() {
   document.querySelectorAll('#adminTabs .nav-link').forEach(link => link.classList.remove('active'));
   document.querySelectorAll('.tab-content .tab-pane').forEach(panel => panel.classList.remove('show', 'active'));
 
-  const tab = document.getElementById('tab-logs');
+  const tab = document.getElementById('tab-logs'); // O tab-logs según tu estructura
   const panel = document.getElementById('content-logs');
   if (!tab || !panel) return;
 
   tab.classList.add('active');
   panel.classList.add('show', 'active');
-  cargarLogsApp();
+
+  supabaseClient.rpc('purgar_app_logs_antiguos')
+    .catch(err => console.error('No se pudo purgar logs antiguos:', err))
+    .finally(() => cargarLogsApp());
 }
 
+
+// Función para eliminar un log manualmente por el operador
+// =======================================================
+// GESTIÓN DE LOGS Y AUDITORÍA
+// =======================================================
+async function eliminarLogManual(id) {
+  const sessionOk = await requireAuth();
+  if (!sessionOk || !canDelete()) {
+    mostrarNotificacion('Solo un administrador puede borrar registros.', 'danger');
+    return;
+  }
+
+  const confirmar = await confirmarAccionModal(
+    'Eliminar registro',
+    '¿Estás seguro de borrar este log permanentemente?'
+  );
+
+  if (confirmar) {
+    const { error } = await supabaseClient.from('app_logs').delete().eq('id', id);
+    if (error) {
+      mostrarNotificacion('Error al eliminar: ' + error.message, 'danger');
+      return;
+    }
+    mostrarNotificacion('Registro eliminado.', 'success');
+    cargarLogsApp();
+  }
+}
+
+async function cargarLogsApp() {
+  const sessionOk = await requireAuth();
+  if (!sessionOk) return;
+
+  const tbody = document.getElementById('tblLogsApp');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando registros...</td></tr>';
+
+  const { data, error } = await supabaseClient
+    .from('app_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error('Error al cargar logs:', error);
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error: ${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = (data || []).map(log => {
+    const esObsoleto = esRegistroObsoleto(log.created_at) || log.estado === 'obsoleto';
+
+    return `
+      <tr class="${esObsoleto ? 'table-warning' : ''}">
+        <td><small>${log.created_at ? new Date(log.created_at).toLocaleString('es-AR') : '-'}</small></td>
+        <td><span class="badge text-bg-secondary">${escapeHtml(log.modulo || '-')}</span></td>
+        <td><span class="badge text-bg-danger">${escapeHtml(log.accion || '-')}</span></td>
+        <td><code>${escapeHtml(log.referencia || '-')}</code></td>
+        <td>${escapeHtml(log.detalle || '-')}</td>
+        <td>${escapeHtml(log.usuario_email || 'sistema')}</td>
+        <td class="text-end">
+          ${esObsoleto ? '<span class="badge bg-warning text-dark me-1">+10 días</span>' : ''}
+          ${canDelete() ? `
+            <button class="btn btn-sm btn-outline-danger" onclick="eliminarLogManual('${log.id}')" title="Borrar manualmente">
+              <i class="bi bi-trash"></i>
+            </button>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="7" class="text-center py-3">No hay actividad registrada.</td></tr>';
+}
+
+// Exposición global
+
+window.cargarLogsApp = cargarLogsApp; 
+window.eliminarLogManual = eliminarLogManual;
+window.registrarLogApp = registrarLogApp;
 window.mostrarPanelUsuarios = mostrarPanelUsuarios;
 window.mostrarPanelConfiguracion = mostrarPanelConfiguracion;
 window.mostrarPanelLogs = mostrarPanelLogs;
@@ -83,6 +163,15 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// =======================================================
+// FUNCIONES UTILITARIAS Y DE VALIDACIÓN
+// =======================================================
+function esRegistroObsoleto(fechaCreatedAt) {
+  if (!fechaCreatedAt) return false;
+  const diezDiasEnMs = 10 * 24 * 60 * 60 * 1000;
+  return (new Date().getTime() - new Date(fechaCreatedAt).getTime()) > diezDiasEnMs;
 }
 
 function sanitizeText(value, maxLength = 200) {
@@ -126,38 +215,6 @@ async function registrarLogApp(modulo, accion, referencia = '', detalle = '') {
   }
 }
 
-async function cargarLogsApp() {
-  if (!(await requireAuth()) || !canDelete()) return;
-  const tbody = document.getElementById('tblLogsApp');
-  if (!tbody) return;
-
-  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando registros...</td></tr>';
-  const { data, error } = await supabaseClient
-    .from('app_logs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(200);
-
-  if (error) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">No se pudieron cargar los registros: ${escapeHtml(error.message)}</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = (data || []).map(log => `
-    <tr>
-      <td><small>${log.created_at ? new Date(log.created_at).toLocaleString('es-AR') : '-'}</small></td>
-      <td><span class="badge text-bg-secondary">${escapeHtml(log.modulo || '-')}</span></td>
-      <td><span class="badge text-bg-danger">${escapeHtml(log.accion || '-')}</span></td>
-      <td><code>${escapeHtml(log.referencia || '-')}</code></td>
-      <td>${escapeHtml(log.detalle || '-')}</td>
-      <td>${escapeHtml(log.usuario_email || 'sistema')}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="6" class="text-center py-3">No hay actividad registrada.</td></tr>';
-}
-
-window.registrarLogApp = registrarLogApp;
-window.cargarLogsApp = cargarLogsApp;
-
 async function cargarDatosEnvios() {
   const sessionOk = await requireAuth();
   if (!sessionOk) return;
@@ -189,6 +246,7 @@ function renderTablaEnvios() {
     if (c.estado === 'error') badgeClass = 'badge-error';
 
     const tr = document.createElement('tr');
+    if (esRegistroObsoleto(c.created_at)) tr.classList.add('table-warning');
 
     const selectionCell = document.createElement('td');
     const selection = document.createElement('input');
@@ -1232,6 +1290,9 @@ async function guardarTodasConfiguracionesSistema() {
     mostrarNotificacion('Error al guardar configuraciones: ' + err.message, 'danger');
   }
 }
+
+
+
 
 // Exposición global
 window.cargarConfiguracionesSistema = cargarConfiguracionesSistema;
