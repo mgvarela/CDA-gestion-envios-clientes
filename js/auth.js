@@ -253,6 +253,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
 
 async function checkUser() {
   const { data: { session } } = await supabaseClient.auth.getSession();
+  document.getElementById('authLoading')?.classList.add('d-none');
   if (session) {
     await loadUserRole();
     document.getElementById('loginSection').classList.add('d-none');

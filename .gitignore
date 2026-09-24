@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+js/env.local.js
 
 # Claves privadas y certificados
 *.pem

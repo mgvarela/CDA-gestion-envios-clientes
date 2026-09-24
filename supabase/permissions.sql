@@ -376,6 +376,19 @@ create unique index if not exists admin_promos_bancarias_codigo_unique
 create unique index if not exists admin_novedades_codigo_unique
   on public.admin_novedades (codigo)
   where codigo is not null;
+
+-- Tabla de clientes del módulo de Envíos (puede faltar en proyectos nuevos).
+create table if not exists public.clientes (
+  id uuid default gen_random_uuid() primary key,
+  nombre text not null,
+  pedido text,
+  mail text not null,
+  template_id text,
+  estado text default 'sin aviso',
+  fecha_envio timestamptz,
+  created_at timestamptz default now()
+);
+
 alter table public.clientes
   add column if not exists fecha_envio timestamptz;
 

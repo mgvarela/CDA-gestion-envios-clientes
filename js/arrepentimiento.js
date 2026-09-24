@@ -251,7 +251,7 @@ function renderizarArrepentimientos() {
     const coincideEnvio = !filtroEnvio || (filtroEnvio === 'enviado' ? item.fecha_envio : !item.fecha_envio);
     const coincideVista = vistaArrepentimientos === 'caja'
       ? item.estado === 'Enviado a Caja'
-      : item.estado !== 'Enviado a Caja';
+      : filtroEstado === 'Enviado a Caja' || item.estado !== 'Enviado a Caja';
     return coincideTexto && coincideEstado && coincideEnvio && coincideVista;
   });
 
@@ -386,50 +386,25 @@ async function aplicarCambiosMasivosArrepentimientos() {
   if (!ids.length) return mostrarNotificacion('Seleccioná al menos una fila.', 'warning');
   if (!estado && !canal) return mostrarNotificacion('Elegí un estado o canal para aplicar.', 'warning');
 
-  if (estado === 'Cerrado' || estado === 'Cerrado sin gestion' || estado === 'Devuelve Sucursal' || estado === 'Avisar a Sucursal') {
-    if (canal) {
-      const { error: canalError } = await supabaseClient.from('arrepentimientos').update({ canal }).in('id', ids);
-      if (canalError) return mostrarNotificacion('No se pudo actualizar el canal: ' + canalError.message, 'danger');
-    }
+  // El canal se aplica primero y se refleja en memoria para que, si además se
+  // cambia el estado (por ejemplo a un cierre que archiva en Sheets), el canal
+  // ya esté actualizado en el registro que se envía al webhook.
+  if (canal) {
+    const { error: canalError } = await supabaseClient.from('arrepentimientos').update({ canal }).in('id', ids);
+    if (canalError) return mostrarNotificacion('No se pudo actualizar el canal: ' + canalError.message, 'danger');
+    listaArrepentimientos.forEach(item => {
+      if (ids.includes(String(item.id))) item.canal = canal;
+    });
+  }
+
+  // Reutiliza la misma función que el cambio individual para que plantilla,
+  // destinatario y estado_cliente queden siempre consistentes.
+  if (estado) {
     for (const id of ids) {
       await cambiarEstadoArrepentimiento(id, estado);
     }
-    return;
   }
 
-  const cambios = {};
-  if (estado) cambios.estado = estado;
-  if (estado === 'Devuelve Sucursal') cambios.sucursal = '';
-  if (canal) cambios.canal = canal;
-  if (estado === 'Enviado a Caja') cambios.emails_destino = getDestinatarioFacturacion();
-  const { error } = await supabaseClient.from('arrepentimientos').update(cambios).in('id', ids);
-  if (error) return mostrarNotificacion('No se pudieron aplicar los cambios: ' + error.message, 'danger');
-
-  if (estado && estado !== 'Enviado a Caja') {
-    const actualizacionesDestinatario = listaArrepentimientos
-      .filter(item => ids.includes(String(item.id)))
-      .map(item => supabaseClient.from('arrepentimientos').update({
-        emails_destino: estado === 'Devuelve Sucursal'
-          ? item.emails_destino || ''
-          : item.cliente_email || item.cliente_mail || ''
-      }).eq('id', item.id));
-    await Promise.all(actualizacionesDestinatario);
-  }
-
-  listaArrepentimientos.forEach(item => {
-    if (ids.includes(String(item.id))) {
-      Object.assign(item, cambios);
-      if (estado && estado !== 'Enviado a Caja') {
-        item.emails_destino = estado === 'Devuelve Sucursal' ? item.cliente_email || item.cliente_mail || '' : item.cliente_email || item.cliente_mail || '';
-        if (estado === 'Devuelve Sucursal') item.sucursal = '';
-      }
-    }
-  });
-  if (estado === 'Enviado a Caja') {
-    for (const id of ids) {
-      await enviarMailArrepentimiento(id, false, 'automatico-caja');
-    }
-  }
   document.getElementById('bulkEstadoArrepentimiento').value = '';
   document.getElementById('bulkCanalArrepentimiento').value = '';
   renderizarArrepentimientos();
@@ -511,7 +486,7 @@ async function importarArrepentimientosCSV(event) {
       const email = getVal(['Email', 'Mail']);
       const motivo1 = getVal(['Motivo 1', 'Motivo']);
       const otroVal = getVal(['Otro', 'Otro motivo', 'Otros', 'Motivo 2']);
-      const canalVal = getVal(['Canal', 'Channel']);
+      const canalVal = getVal(['Canal', 'Channel']) || 'web';
       const comentarioVal = getVal(['Comentarios', 'Comentario']);
       const montoVal = getVal(['Monto a devolver', 'Monto', 'Importe']);
       const estadoOriginal = getVal(['Estado', 'Estado Pedido', 'Estado del pedido']) || 'Otros';
@@ -634,7 +609,7 @@ async function cambiarEstadoArrepentimiento(id, nuevoEstado) {
       return;
     }
     const pId = item.pedido_id || item.numero_pedido || item.pedido || 'S/N';
-    const hojaDestino = nuevoEstado === 'Cerrado sin gestion' ? 'Cerrado sin gestion' : 'Histórico';
+    const hojaDestino = nuevoEstado === 'Cerrado sin gestion' ? 'Cerrado sin gestion' : 'Historico_Cerrados';
     const confirmar = await confirmarAccionModal(
       nuevoEstado === 'Cerrado sin gestion' ? 'Cerrar sin gestión' : 'Cerrar y archivar solicitud',
       `La solicitud del pedido "${pId}" se enviará a la hoja "${hojaDestino}" y se eliminará de la tabla activa. ¿Confirmar?`
@@ -988,7 +963,7 @@ async function guardarNuevoArrepentimiento(event) {
   const cliente_dni = arrepentimientoTextoSeguro(document.getElementById('arrClienteDni')?.value, 40);
   const cliente_telefono = arrepentimientoTextoSeguro(document.getElementById('arrClienteTelefono')?.value, 50);
   const pedidoVal = arrepentimientoTextoSeguro(document.getElementById('arrPedidoId')?.value, 80);
-  const canal = document.getElementById('arrCanal')?.value || '';
+  const canal = document.getElementById('arrCanal')?.value || 'web';
   const montoVal = document.getElementById('arrMontoDevolver')?.value;
   const motivo = document.getElementById('arrMotivo')?.value || 'Arrepentimiento de compra';
   const otro = arrepentimientoTextoSeguro(document.getElementById('arrOtro')?.value, 200);

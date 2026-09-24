@@ -3,13 +3,16 @@
 // =======================================================
 
 // 1. Parámetros públicos de conexión (cliente)
-const APP_ENV = {
+// Si "js/env.local.js" se cargó antes que este archivo (solo en desarrollo local,
+// no versionado), respeta esos valores para apuntar a un proyecto Supabase de pruebas.
+const APP_ENV = window.APP_ENV || {
   SUPABASE_URL: "https://ievbmsddbydxgnzknavl.supabase.co",
   SUPABASE_KEY: "sb_publishable_kBv1ve1gybdtaigXFuJ_Mw_7DmuGj_s",
   EMAILJS_SERVICE_ID: "service_n9o55gp",
   EMAILJS_TEMPLATE_ID: "template_s8suav5",
   EMAILJS_PUBLIC_KEY: "kyyRWVy91lz7Wqh0Y"
 };
+window.APP_ENV = APP_ENV;
 
 // 2. Valores predeterminados para variables dinámicas / sensibles
 const CONFIG_DEFAULTS = {
