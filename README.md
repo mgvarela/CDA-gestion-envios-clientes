@@ -1,8 +1,8 @@
-# 🚀 Control Hub
+# 🚀 Admin PostVenta / Facturacion
 
 ### Sistema Integrado de Gestión de Pedidos, Envíos y Clientes
 
-Control Hub es un **panel de administración centralizado** desarrollado como **Single Page Application (SPA)** para optimizar procesos operativos, logísticos y de comunicación **post-venta** de un e-commerce.
+Admin PostVenta / Facturacion es un **panel de administración centralizado** desarrollado como **Single Page Application (SPA)** para optimizar procesos operativos, logísticos y de comunicación **post-venta** de un e-commerce.
 
 La plataforma centraliza diferentes tareas internas en una única interfaz, reduciendo procesos manuales y facilitando el seguimiento de clientes, pedidos, comunicaciones y gestiones post-compra.
 
@@ -127,7 +127,7 @@ La aplicación utiliza una arquitectura frontend ligera basada en una **SPA**, c
 
 ```text
 ┌─────────────────────────────┐
-│        Control Hub          │
+│        Admin PostVenta / Facturacion          │
 │          SPA                │
 └──────────────┬──────────────┘
                │
@@ -311,7 +311,7 @@ Usuario interno
       │
       ▼
 ┌─────────────────┐
-│   Control Hub   │
+│   Admin PostVenta / Facturacion   │
 └────────┬────────┘
          │
     ┌────┴─────┐
@@ -368,7 +368,7 @@ La documentación puede utilizarse como fuente de conocimiento para consultar:
 * Próximas funcionalidades.
 * Decisiones técnicas.
 
-Esto permite utilizar IA como una capa adicional de documentación y soporte durante la evolución de **Control Hub**.
+Esto permite utilizar IA como una capa adicional de documentación y soporte durante la evolución de **Admin PostVenta / Facturacion**.
 
 ---
 
@@ -393,7 +393,7 @@ Algunas funcionalidades previstas:
 
 **En desarrollo 🚧**
 
-Control Hub se encuentra en evolución continua y puede incorporar nuevos módulos, integraciones y automatizaciones según las necesidades operativas.
+Admin PostVenta / Facturacion se encuentra en evolución continua y puede incorporar nuevos módulos, integraciones y automatizaciones según las necesidades operativas.
 
 ---
 
@@ -401,4 +401,4 @@ Control Hub se encuentra en evolución continua y puede incorporar nuevos módul
 
 Proyecto de uso interno.
 
-© 2026 Control Hub
+© 2026 Admin PostVenta / Facturacion

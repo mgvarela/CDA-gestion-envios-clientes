@@ -21,7 +21,10 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 0.875rem; /* 14px base */
   line-height: 1.4;
-  padding-bottom: 40px;
+}
+.footer .container a,
+.footer .container{
+ color:#f8f9fa !important;
 }
 
 /* Jerarquía de encabezados escalada para dashboard */

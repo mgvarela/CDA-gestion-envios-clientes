@@ -1,5 +1,5 @@
 // =======================================================
-// CONFIGURACIÓN CENTRALIZADA DEL SISTEMA (Control Hub)
+// CONFIGURACIÓN CENTRALIZADA DEL SISTEMA (Admin PostVenta / Facturacion)
 // =======================================================
 
 // 1. Parámetros públicos de conexión (cliente)

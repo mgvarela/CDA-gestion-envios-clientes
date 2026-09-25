@@ -1081,7 +1081,7 @@ async function enviarMailsSeleccionados(tipo) {
 
   const { data } = await supabaseClient.from(tabla).select('*').in('id', ids);
   
-  let mensajeCuerpo = `Resumen de cambios enviados desde Control Hub:\n\n` + JSON.stringify(data, null, 2);
+  let mensajeCuerpo = `Resumen de cambios enviados desde Admin PostVenta / Facturacion:\n\n` + JSON.stringify(data, null, 2);
 
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {

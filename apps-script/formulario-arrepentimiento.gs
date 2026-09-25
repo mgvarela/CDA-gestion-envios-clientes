@@ -78,7 +78,7 @@ function enviarASupabase(e) {
 }
 
 // =========================================================================
-// 2. SALIDA: Control Hub -> Google Sheet (Webhook de archivado)
+// 2. SALIDA: Admin PostVenta / Facturacion -> Google Sheet (Webhook de archivado)
 // =========================================================================
 function doPost(e) {
   try {

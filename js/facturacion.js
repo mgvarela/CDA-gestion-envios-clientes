@@ -2,7 +2,7 @@ let listaFacturacion = [];
 let vistaFacturacion = 'principal';
 let tiendasFacturacion = [];
 let operadoresFacturacion = [];
-const OPERADORES_CAJA_FIJOS = ['Nuria', 'Gabriela']; // Operadores de caja fijos
+const OPERADORES_CAJA_FIJOS = ['Nuria', 'Gabriela'];
 
 const TIENDAS_FACTURACION_INICIALES = ['Provincia Wins', 'Personal', 'Shell', 'Infobae', 'Nación', 'Credicoop', 'Comafi', 'Macro'];
 
@@ -44,7 +44,7 @@ async function cargarFacturacion() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger">No se pudieron cargar los pedidos: ${escapeHtml(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">No se pudieron cargar los pedidos: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
 
@@ -59,7 +59,6 @@ function estadoClaseFacturacion(estado) {
   return 'bg-primary';
 }
 
-
 function renderizarFacturacion() {
   const tbody = document.getElementById('tblFacturacion');
   if (!tbody) return;
@@ -69,7 +68,7 @@ function renderizarFacturacion() {
   const tiendaFiltro = document.getElementById('filtroTiendaFacturacion')?.value || '';
   const operadorCajaFiltro = document.getElementById('filtroOperadorCajaFacturacion')?.value || '';
 
-  // Poblar selects superiores
+  // Poblar selects superiores utilizando OPERADORES_CAJA_FIJOS
   cargarSelectCatalogoFacturacion('filtroTiendaFacturacion', tiendasFacturacion, 'Todas las tiendas', tiendaFiltro);
   cargarSelectCatalogoFacturacion('filtroOperadorCajaFacturacion', OPERADORES_CAJA_FIJOS, 'Todos los operadores caja', operadorCajaFiltro);
 
@@ -100,8 +99,8 @@ function renderizarFacturacion() {
     return;
   }
 
-tbody.innerHTML = registros.map(item => {
-    const puedeEditar = puedeEditarFacturacion();
+  tbody.innerHTML = registros.map(item => {
+    const puedeEditar = puedeEditarFacturacion(); // Función correcta sin erratas
     let acciones = '';
     if (vistaFacturacion === 'principal') {
       acciones = `
@@ -149,17 +148,6 @@ tbody.innerHTML = registros.map(item => {
     </tr>`;
   }).join('');
 }
-async function actualizarOperadorCaja(id, value) {
-  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
-  const operadorCaja = textoFacturacion(value, 100);
-  const { error } = await supabaseClient.from('facturacion_pedidos').update({ operador_caja: operadorCaja }).eq('id', id);
-  if (error) return mostrarNotificacion('No se pudo actualizar el operador de caja: ' + error.message, 'danger');
-  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
-  if (pedido) pedido.operador_caja = operadorCaja;
-  mostrarNotificacion('Operador de caja actualizado.', 'success');
-}
-
-window.actualizarOperadorCaja = actualizarOperadorCaja;
 
 function cambiarVistaFacturacion(vista) {
   vistaFacturacion = ['caja', 'facturados'].includes(vista) ? vista : 'principal';
@@ -167,15 +155,6 @@ function cambiarVistaFacturacion(vista) {
   document.getElementById('subnavFacturacionCaja')?.classList.toggle('active', vistaFacturacion === 'caja');
   document.getElementById('subnavFacturacionFacturados')?.classList.toggle('active', vistaFacturacion === 'facturados');
   renderizarFacturacion();
-}
-async function actualizarOperadorCaja(id, valor) {
-  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
-  const operadorCaja = textoFacturacion(valor, 100);
-  const { error } = await supabaseClient.from('facturacion_pedidos').update({ operador_caja: operadorCaja }).eq('id', id);
-  if (error) return mostrarNotificacion('No se pudo actualizar el operador de caja: ' + error.message, 'danger');
-  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
-  if (pedido) pedido.operador_caja = operadorCaja;
-  mostrarNotificacion('Operador de caja actualizado.', 'success');
 }
 
 async function abrirModalFacturacion(id = '') {
@@ -213,22 +192,13 @@ async function guardarCatalogoFacturacion(event) {
   const tipo = document.getElementById('factCatalogoTipo').value;
   const nombre = textoFacturacion(document.getElementById('factCatalogoNombre').value, 100);
   if (!nombre) return;
-  
-  let tabla = 'facturacion_tiendas';
-  if (tipo === 'operador') tabla = 'facturacion_operadores';
-  if (tipo === 'operador_caja') tabla = 'facturacion_operadores_caja';
-
+  const tabla = tipo === 'tienda' ? 'facturacion_tiendas' : 'facturacion_operadores';
   const { error } = await supabaseClient.from(tabla).upsert({ nombre }, { onConflict: 'nombre' });
-  if (error) return mostrarNotificacion(`No se pudo agregar el registro: ${error.message}`, 'danger');
-  
+  if (error) return mostrarNotificacion(`No se pudo agregar el ${tipo}: ${error.message}`, 'danger');
   bootstrap.Modal.getInstance(document.getElementById('modalCatalogoFacturacion'))?.hide();
   await cargarCatalogosFacturacion();
-  
-  if (tipo === 'tienda') cargarSelectCatalogoFacturacion('factTienda', tiendasFacturacion, 'Seleccionar tienda...', nombre);
-  if (tipo === 'operador') cargarSelectCatalogoFacturacion('factOperador', operadoresFacturacion, 'Seleccionar operador...', nombre);
-  
-  mostrarNotificacion('Catálogo actualizado correctamente.', 'success');
-  renderizarFacturacion();
+  cargarSelectCatalogoFacturacion(tipo === 'tienda' ? 'factTienda' : 'factOperador', tipo === 'tienda' ? tiendasFacturacion : operadoresFacturacion, tipo === 'tienda' ? 'Seleccionar tienda...' : 'Seleccionar operador...', nombre);
+  mostrarNotificacion(`${tipo === 'tienda' ? 'Tienda' : 'Operador'} agregado.`, 'success');
 }
 
 async function guardarPedidoFacturacion(event) {
@@ -344,6 +314,16 @@ async function actualizarNotasFacturacion(id, value) {
   mostrarNotificacion('Comentario actualizado.', 'success');
 }
 
+async function actualizarOperadorCaja(id, value) {
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const operadorCaja = textoFacturacion(value, 100);
+  const { error } = await supabaseClient.from('facturacion_pedidos').update({ operador_caja: operadorCaja }).eq('id', id);
+  if (error) return mostrarNotificacion('No se pudo actualizar el operador de caja: ' + error.message, 'danger');
+  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
+  if (pedido) pedido.operador_caja = operadorCaja;
+  mostrarNotificacion('Operador de caja actualizado.', 'success');
+}
+
 function seleccionarTodosFacturados(checked) {
   document.querySelectorAll('.chk-facturado').forEach(input => {
     input.checked = checked;
@@ -367,11 +347,11 @@ async function descargarFacturadosSeleccionados() {
   );
   if (!confirmar) return;
 
-  const encabezados = ['Fecha compra', 'Tienda', 'ID compra', 'Pedido', 'Operador', 'Estado', 'Notas / comentarios', 'Número comprobante', 'Fecha facturación'];
+  const encabezados = ['Fecha compra', 'Tienda', 'ID compra', 'Pedido', 'Operador', 'Operador Caja', 'Estado', 'Notas / comentarios', 'Número comprobante', 'Fecha facturación'];
   const csv = [
     encabezados.join(';'),
     ...registros.map(item => [
-      item.fecha_compra || '', item.tienda || '', item.id_compra || '', item.pedido || '', item.operador || '', item.estado || '', item.notas || '', item.numero_comprobante || '', item.fecha_facturacion ? new Date(item.fecha_facturacion).toLocaleString('es-AR') : ''
+      item.fecha_compra || '', item.tienda || '', item.id_compra || '', item.pedido || '', item.operador || '', item.operador_caja || '', item.estado || '', item.notas || '', item.numero_comprobante || '', item.fecha_facturacion ? new Date(item.fecha_facturacion).toLocaleString('es-AR') : ''
     ].map(csvEscapeFacturacion).join(';'))
   ].join('\r\n');
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -402,6 +382,6 @@ window.eliminarPedidoFacturacion = eliminarPedidoFacturacion;
 window.abrirModalComprobanteFacturacion = abrirModalComprobanteFacturacion;
 window.confirmarFacturacion = confirmarFacturacion;
 window.actualizarNotasFacturacion = actualizarNotasFacturacion;
+window.actualizarOperadorCaja = actualizarOperadorCaja;
 window.seleccionarTodosFacturados = seleccionarTodosFacturados;
 window.descargarFacturadosSeleccionados = descargarFacturadosSeleccionados;
-window.actualizarOperadorCaja = actualizarOperadorCaja;
