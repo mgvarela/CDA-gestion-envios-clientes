@@ -27,6 +27,25 @@
     </button>
   </nav>
 
+  <!-- Accesos directos a tiendas y plataformas -->
+  <div class="card p-3 mb-3 bg-light">
+    <p class="small fw-semibold text-muted mb-2"><i class="bi bi-link-45deg"></i> Accesos directos a plataformas:</p>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="https://ui-seller.logicoapi.com/contenido/ventas/del-mes" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> Infobae
+      </a>
+      <a href="https://market.personal.com.ar/backoffice/index.php?controller=AdminLogin&redirect=AdminOrders" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> Personal
+      </a>
+      <a href="https://casadelaudiowins028.myvtex.com/admin/orders" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> Provincia Wins
+      </a>
+      <a href="https://central-content-federacion-patronal.production.simplitec.io/admin/content/orders" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> Federacion
+      </a>
+    </div>
+  </div>
+
   <div class="d-flex justify-content-end mb-3" id="accionesFacturados" hidden>
     <button class="btn btn-outline-success btn-sm" type="button" onclick="descargarFacturadosSeleccionados()" data-role-action="write">
       <i class="bi bi-file-earmark-arrow-down"></i> Descargar seleccionados y quitar de Facturación
@@ -77,6 +96,7 @@
     </div>
   </div>
 
+  <!-- Modales -->
   <div class="modal fade" id="modalFacturacion" tabindex="-1" aria-labelledby="modalFacturacionLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
@@ -109,12 +129,10 @@
               <div class="col-md-6">
                 <label class="form-label small fw-semibold" for="factIdCompra">ID de compra *</label>
                 <input class="form-control form-control-sm" type="text" id="factIdCompra" maxlength="100" required placeholder="Identificador de la compra">
-
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold" for="factPedido">Pedido *</label>
                 <input class="form-control form-control-sm" type="text" id="factPedido" maxlength="100" required placeholder="Número de pedido">
-
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold" for="factEstado">Estado</label>
