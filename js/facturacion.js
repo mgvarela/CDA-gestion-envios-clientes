@@ -2,6 +2,7 @@ let listaFacturacion = [];
 let vistaFacturacion = 'principal';
 let tiendasFacturacion = [];
 let operadoresFacturacion = [];
+const OPERADORES_CAJA_FIJOS = ['Nuria', 'Gabriela']; // Operadores de caja fijos
 
 const TIENDAS_FACTURACION_INICIALES = ['Provincia Wins', 'Personal', 'Shell', 'Infobae', 'Nación', 'Credicoop', 'Comafi', 'Macro'];
 
@@ -58,12 +59,20 @@ function estadoClaseFacturacion(estado) {
   return 'bg-primary';
 }
 
+
 function renderizarFacturacion() {
   const tbody = document.getElementById('tblFacturacion');
   if (!tbody) return;
 
   const query = (document.getElementById('buscarFacturacion')?.value || '').toLowerCase();
   const estadoFiltro = document.getElementById('filtroEstadoFacturacion')?.value || '';
+  const tiendaFiltro = document.getElementById('filtroTiendaFacturacion')?.value || '';
+  const operadorCajaFiltro = document.getElementById('filtroOperadorCajaFacturacion')?.value || '';
+
+  // Poblar selects superiores
+  cargarSelectCatalogoFacturacion('filtroTiendaFacturacion', tiendasFacturacion, 'Todas las tiendas', tiendaFiltro);
+  cargarSelectCatalogoFacturacion('filtroOperadorCajaFacturacion', OPERADORES_CAJA_FIJOS, 'Todos los operadores caja', operadorCajaFiltro);
+
   const pendientesCaja = listaFacturacion.filter(item => item.en_caja && item.estado !== 'Facturado');
   const facturados = listaFacturacion.filter(item => item.estado === 'Facturado');
   const registrosBase = vistaFacturacion === 'caja'
@@ -71,9 +80,13 @@ function renderizarFacturacion() {
     : vistaFacturacion === 'facturados'
       ? facturados
       : listaFacturacion.filter(item => !item.en_caja && item.estado !== 'Facturado');
+
   const registros = registrosBase.filter(item => {
-    const texto = [item.fecha_compra, item.tienda, item.id_compra, item.pedido, item.operador, item.estado, item.notas, item.numero_comprobante].join(' ').toLowerCase();
-    return (!query || texto.includes(query)) && (!estadoFiltro || item.estado === estadoFiltro);
+    const texto = [item.fecha_compra, item.tienda, item.id_compra, item.pedido, item.operador, item.operador_caja, item.estado, item.notas, item.numero_comprobante].join(' ').toLowerCase();
+    return (!query || texto.includes(query)) && 
+           (!estadoFiltro || item.estado === estadoFiltro) &&
+           (!tiendaFiltro || item.tienda === tiendaFiltro) &&
+           (!operadorCajaFiltro || item.operador_caja === operadorCajaFiltro);
   });
 
   document.getElementById('contadorFacturacionCaja').textContent = pendientesCaja.length;
@@ -83,11 +96,11 @@ function renderizarFacturacion() {
   document.getElementById('columnaSeleccionFacturados').hidden = vistaFacturacion !== 'facturados';
 
   if (!registros.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4">No hay pedidos en esta bandeja.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No hay pedidos en esta bandeja.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = registros.map(item => {
+tbody.innerHTML = registros.map(item => {
     const puedeEditar = puedeEditarFacturacion();
     let acciones = '';
     if (vistaFacturacion === 'principal') {
@@ -108,14 +121,27 @@ function renderizarFacturacion() {
       ? `<small>${escapeHtml(item.notas || '-')}</small>`
       : `<textarea class="form-control form-control-sm" rows="2" maxlength="1000" placeholder="Agregar comentario..." onchange="actualizarNotasFacturacion('${item.id}', this.value)">${escapeHtml(item.notas || '')}</textarea>`;
 
+    let selectOperadorCaja = '-';
+    if (vistaFacturacion === 'caja') {
+      selectOperadorCaja = puedeEditar
+        ? `<select class="form-select form-select-sm" onchange="actualizarOperadorCaja('${item.id}', this.value)">
+             <option value="">Seleccionar...</option>
+             ${OPERADORES_CAJA_FIJOS.map(op => `<option value="${escapeHtml(op)}" ${item.operador_caja === op ? 'selected' : ''}>${escapeHtml(op)}</option>`).join('')}
+           </select>`
+        : `<span>${escapeHtml(item.operador_caja || '-')}</span>`;
+    } else if (vistaFacturacion === 'facturados') {
+      selectOperadorCaja = `<span>${escapeHtml(item.operador_caja || '-')}</span>`;
+    }
+
     const esObsoleto = vistaFacturacion !== 'facturados' && esRegistroObsoleto(item.created_at);
     return `<tr class="${esObsoleto ? 'table-warning' : ''}">
-      ${vistaFacturacion === 'facturados' ? `<td class="text-center"><input class="form-check-input chk-facturado" type="checkbox" value="${item.id}" aria-label="Seleccionar pedido ${escapeHtml(item.pedido || '')}"></td>` : '<td hidden></td>'}
+      ${vistaFacturacion === 'facturados' ? `<td class="text-center"><input class="form-check-input chk-facturado" type="checkbox" value="${item.id}" aria-label="Seleccionar pedido"></td>` : '<td hidden></td>'}
       <td>${item.fecha_compra ? new Date(`${item.fecha_compra}T00:00:00`).toLocaleDateString('es-AR') : '-'}</td>
       <td>${escapeHtml(item.tienda || '-')}</td>
       <td>${escapeHtml(item.id_compra || '-')}</td>
       <td><strong>${escapeHtml(item.pedido || '-')}</strong></td>
       <td>${escapeHtml(item.operador || '-')}</td>
+      <td>${selectOperadorCaja}</td>
       <td><span class="badge ${estadoClaseFacturacion(item.estado)}">${escapeHtml(item.estado || 'Pedido Nuevo')}</span></td>
       <td>${notas}</td>
       <td>${escapeHtml(item.numero_comprobante || '-')}</td>
@@ -123,6 +149,17 @@ function renderizarFacturacion() {
     </tr>`;
   }).join('');
 }
+async function actualizarOperadorCaja(id, value) {
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const operadorCaja = textoFacturacion(value, 100);
+  const { error } = await supabaseClient.from('facturacion_pedidos').update({ operador_caja: operadorCaja }).eq('id', id);
+  if (error) return mostrarNotificacion('No se pudo actualizar el operador de caja: ' + error.message, 'danger');
+  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
+  if (pedido) pedido.operador_caja = operadorCaja;
+  mostrarNotificacion('Operador de caja actualizado.', 'success');
+}
+
+window.actualizarOperadorCaja = actualizarOperadorCaja;
 
 function cambiarVistaFacturacion(vista) {
   vistaFacturacion = ['caja', 'facturados'].includes(vista) ? vista : 'principal';
@@ -130,6 +167,15 @@ function cambiarVistaFacturacion(vista) {
   document.getElementById('subnavFacturacionCaja')?.classList.toggle('active', vistaFacturacion === 'caja');
   document.getElementById('subnavFacturacionFacturados')?.classList.toggle('active', vistaFacturacion === 'facturados');
   renderizarFacturacion();
+}
+async function actualizarOperadorCaja(id, valor) {
+  if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
+  const operadorCaja = textoFacturacion(valor, 100);
+  const { error } = await supabaseClient.from('facturacion_pedidos').update({ operador_caja: operadorCaja }).eq('id', id);
+  if (error) return mostrarNotificacion('No se pudo actualizar el operador de caja: ' + error.message, 'danger');
+  const pedido = listaFacturacion.find(item => String(item.id) === String(id));
+  if (pedido) pedido.operador_caja = operadorCaja;
+  mostrarNotificacion('Operador de caja actualizado.', 'success');
 }
 
 async function abrirModalFacturacion(id = '') {
@@ -167,13 +213,22 @@ async function guardarCatalogoFacturacion(event) {
   const tipo = document.getElementById('factCatalogoTipo').value;
   const nombre = textoFacturacion(document.getElementById('factCatalogoNombre').value, 100);
   if (!nombre) return;
-  const tabla = tipo === 'tienda' ? 'facturacion_tiendas' : 'facturacion_operadores';
+  
+  let tabla = 'facturacion_tiendas';
+  if (tipo === 'operador') tabla = 'facturacion_operadores';
+  if (tipo === 'operador_caja') tabla = 'facturacion_operadores_caja';
+
   const { error } = await supabaseClient.from(tabla).upsert({ nombre }, { onConflict: 'nombre' });
-  if (error) return mostrarNotificacion(`No se pudo agregar el ${tipo}: ${error.message}`, 'danger');
+  if (error) return mostrarNotificacion(`No se pudo agregar el registro: ${error.message}`, 'danger');
+  
   bootstrap.Modal.getInstance(document.getElementById('modalCatalogoFacturacion'))?.hide();
   await cargarCatalogosFacturacion();
-  cargarSelectCatalogoFacturacion(tipo === 'tienda' ? 'factTienda' : 'factOperador', tipo === 'tienda' ? tiendasFacturacion : operadoresFacturacion, tipo === 'tienda' ? 'Seleccionar tienda...' : 'Seleccionar operador...', nombre);
-  mostrarNotificacion(`${tipo === 'tienda' ? 'Tienda' : 'Operador'} agregado.`, 'success');
+  
+  if (tipo === 'tienda') cargarSelectCatalogoFacturacion('factTienda', tiendasFacturacion, 'Seleccionar tienda...', nombre);
+  if (tipo === 'operador') cargarSelectCatalogoFacturacion('factOperador', operadoresFacturacion, 'Seleccionar operador...', nombre);
+  
+  mostrarNotificacion('Catálogo actualizado correctamente.', 'success');
+  renderizarFacturacion();
 }
 
 async function guardarPedidoFacturacion(event) {
@@ -349,3 +404,4 @@ window.confirmarFacturacion = confirmarFacturacion;
 window.actualizarNotasFacturacion = actualizarNotasFacturacion;
 window.seleccionarTodosFacturados = seleccionarTodosFacturados;
 window.descargarFacturadosSeleccionados = descargarFacturadosSeleccionados;
+window.actualizarOperadorCaja = actualizarOperadorCaja;

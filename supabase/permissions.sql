@@ -596,5 +596,52 @@ SELECT cron.unschedule('marcar-obsoletos-todos-modulos') WHERE EXISTS (
 );
 DROP FUNCTION IF EXISTS public.marcar_registros_obsoletos_10dias();
 
+
+
+-- =========================================================================
+
+ALTER TABLE facturacion_pedidos ADD COLUMN IF NOT EXISTS operador_caja TEXT; 
+
+-- Tabla para los operadores de caja
+CREATE TABLE IF NOT EXISTS facturacion_operadores_caja (
+  id SERIAL PRIMARY KEY,
+  nombre TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Agregar la columna operador_caja en facturacion_pedidos si no existe
+ALTER TABLE facturacion_pedidos ADD COLUMN IF NOT EXISTS operador_caja TEXT;
+
+-- 1. Asegurar que la tabla de operadores de caja existe
+CREATE TABLE IF NOT EXISTS facturacion_operadores_caja (
+  id SERIAL PRIMARY KEY,
+  nombre TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Habilitar RLS en las tablas de catálogos de facturación
+ALTER TABLE facturacion_tiendas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion_operadores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion_operadores_caja ENABLE ROW LEVEL SECURITY;
+
+-- 3. Políticas de lectura (todos los usuarios autenticados con rol viewer/editor/admin pueden leer)
+CREATE POLICY "Permitir lectura de tiendas" ON facturacion_tiendas FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir lectura de operadores" ON facturacion_operadores FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir lectura de operadores caja" ON facturacion_operadores_caja FOR SELECT USING (auth.role() = 'authenticated');
+
+-- 4. Políticas de escritura/modificación (solo usuarios con rol editor o admin según permisos actuales)
+-- Asumiendo que utilizas tu función current_user_role() o validación por metadatos, o permitiendo autenticados con rol operativo:
+CREATE POLICY "Permitir escritura en tiendas" ON facturacion_tiendas FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('editor', 'admin'))
+);
+
+CREATE POLICY "Permitir escritura en operadores" ON facturacion_operadores FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('editor', 'admin'))
+);
+
+CREATE POLICY "Permitir escritura en operadores caja" ON facturacion_operadores_caja FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('editor', 'admin'))
+);
+
 -- Notificar recarga de esquemas
 NOTIFY pgrst, 'reload schema';

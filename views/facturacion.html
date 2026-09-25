@@ -52,26 +52,36 @@
     </button>
   </div>
 
-  <div class="filter-panel mb-3">
-    <div class="filter-heading"><i class="bi bi-funnel"></i><span>Buscar pedidos</span></div>
-    <div class="row g-2 align-items-center">
-      <div class="col-md-5">
-        <input type="search" class="form-control form-control-sm" id="buscarFacturacion" placeholder="Buscar por pedido, compra, tienda, operador o comprobante..." oninput="renderizarFacturacion()">
-      </div>
-      <div class="col-md-3">
-        <select class="form-select form-select-sm" id="filtroEstadoFacturacion" onchange="renderizarFacturacion()">
-          <option value="">Todos los estados</option>
-          <option value="Pedido Nuevo">Pedido Nuevo</option>
-          <option value="Corregir">Corregir</option>
-          <option value="Facturado">Facturado</option>
-        </select>
-      </div>
-      <div class="col-md-2">
-        <span class="badge bg-dark" id="resumenFacturacion">0 registros</span>
-      </div>
+<!-- Filtros en views/facturacion.html -->
+<div class="filter-panel mb-3">
+  <div class="filter-heading"><i class="bi bi-funnel"></i><span>Buscar y filtrar pedidos</span></div>
+  <div class="row g-2 align-items-center">
+    <div class="col-md-3">
+      <input type="search" class="form-control form-control-sm" id="buscarFacturacion" placeholder="Buscar pedido, compra..." oninput="renderizarFacturacion()">
+    </div>
+    <div class="col-md-2">
+      <select class="form-select form-select-sm" id="filtroEstadoFacturacion" onchange="renderizarFacturacion()">
+        <option value="">Todos los estados</option>
+        <option value="Pedido Nuevo">Pedido Nuevo</option>
+        <option value="Corregir">Corregir</option>
+        <option value="Facturado">Facturado</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select form-select-sm" id="filtroTiendaFacturacion" onchange="renderizarFacturacion()">
+        <option value="">Todas las tiendas</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filtroOperadorCajaFacturacion" onchange="renderizarFacturacion()">
+        <option value="">Todos los operadores caja</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <span class="badge bg-dark" id="resumenFacturacion">0 registros</span>
     </div>
   </div>
-
+</div>
   <div class="card p-3">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
@@ -83,6 +93,7 @@
             <th>ID compra</th>
             <th>Pedido</th>
             <th>Operador</th>
+            <th>Operador Caja</th>
             <th>Estado</th>
             <th>Notas / comentarios</th>
             <th>N° comprobante</th>
