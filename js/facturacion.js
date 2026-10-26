@@ -44,7 +44,7 @@ async function cargarFacturacion() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">No se pudieron cargar los pedidos: ${escapeHtml(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">No se pudieron cargar los pedidos: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
 
@@ -95,7 +95,7 @@ function renderizarFacturacion() {
   document.getElementById('columnaSeleccionFacturados').hidden = vistaFacturacion !== 'facturados';
 
   if (!registros.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No hay pedidos en esta bandeja.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4">No hay pedidos en esta bandeja.</td></tr>';
     return;
   }
 
@@ -136,6 +136,7 @@ function renderizarFacturacion() {
     return `<tr class="${esObsoleto ? 'table-warning' : ''}">
       ${vistaFacturacion === 'facturados' ? `<td class="text-center"><input class="form-check-input chk-facturado" type="checkbox" value="${item.id}" aria-label="Seleccionar pedido"></td>` : '<td hidden></td>'}
       <td>${item.fecha_compra ? new Date(`${item.fecha_compra}T00:00:00`).toLocaleDateString('es-AR') : '-'}</td>
+      <td>${item.created_at ? new Date(item.created_at).toLocaleDateString('es-AR') : '-'}</td>
       <td>${escapeHtml(item.tienda || '-')}</td>
       <td>${escapeHtml(item.id_compra || '-')}</td>
       <td><strong>${escapeHtml(item.pedido || '-')}</strong></td>
@@ -347,11 +348,11 @@ async function descargarFacturadosSeleccionados() {
   );
   if (!confirmar) return;
 
-  const encabezados = ['Fecha compra', 'Tienda', 'ID compra', 'Pedido', 'Operador', 'Operador Caja', 'Estado', 'Notas / comentarios', 'Número comprobante', 'Fecha facturación'];
+  const encabezados = ['Fecha compra', 'Fecha de carga', 'Tienda', 'ID compra', 'Pedido', 'Operador', 'Operador Caja', 'Estado', 'Notas / comentarios', 'Número comprobante', 'Fecha facturación'];
   const csv = [
     encabezados.join(';'),
     ...registros.map(item => [
-      item.fecha_compra || '', item.tienda || '', item.id_compra || '', item.pedido || '', item.operador || '', item.operador_caja || '', item.estado || '', item.notas || '', item.numero_comprobante || '', item.fecha_facturacion ? new Date(item.fecha_facturacion).toLocaleString('es-AR') : ''
+      item.fecha_compra || '', item.created_at ? new Date(item.created_at).toLocaleDateString('es-AR') : '', item.tienda || '', item.id_compra || '', item.pedido || '', item.operador || '', item.operador_caja || '', item.estado || '', item.notas || '', item.numero_comprobante || '', item.fecha_facturacion ? new Date(item.fecha_facturacion).toLocaleString('es-AR') : ''
     ].map(csvEscapeFacturacion).join(';'))
   ].join('\r\n');
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
