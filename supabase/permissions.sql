@@ -182,6 +182,12 @@ CREATE TABLE IF NOT EXISTS public.facturacion_operadores (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.facturacion_operadores_caja (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Configuraciones de Sistema (Credenciales y variables globales)
 CREATE TABLE IF NOT EXISTS public.configuraciones_sistema (
   clave TEXT PRIMARY KEY,
@@ -355,6 +361,7 @@ BEGIN
     'profiles', 'clientes', 'templates', 'admin_promos', 'admin_promos_bancarias',
     'admin_novedades', 'pedidos_mercaderia', 'arrepentimientos',
     'facturacion_pedidos', 'facturacion_tiendas', 'facturacion_operadores',
+    'facturacion_operadores_caja',
     'configuraciones_sistema'
   ] LOOP
     IF to_regclass('public.' || tbl_name) IS NOT NULL THEN
@@ -398,6 +405,7 @@ ALTER TABLE public.admin_novedades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facturacion_pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facturacion_tiendas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facturacion_operadores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facturacion_operadores_caja ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.configuraciones_sistema ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs ENABLE ROW LEVEL SECURITY;
 
@@ -443,6 +451,17 @@ DROP POLICY IF EXISTS arrepentimientos_update_editor_admin ON public.arrepentimi
 CREATE POLICY arrepentimientos_update_editor_admin ON public.arrepentimientos FOR UPDATE TO authenticated USING (public.can_edit_module('arrepentimiento')) WITH CHECK (public.can_edit_module('arrepentimiento'));
 DROP POLICY IF EXISTS arrepentimientos_delete_admin ON public.arrepentimientos;
 CREATE POLICY arrepentimientos_delete_admin ON public.arrepentimientos FOR DELETE TO authenticated USING (public.current_user_role() = 'admin');
+
+-- Operadores de caja
+DROP POLICY IF EXISTS facturacion_operadores_caja_select_authenticated ON public.facturacion_operadores_caja;
+CREATE POLICY facturacion_operadores_caja_select_authenticated
+ON public.facturacion_operadores_caja FOR SELECT TO authenticated
+USING (public.can_access_module('facturacion'));
+DROP POLICY IF EXISTS facturacion_operadores_caja_write ON public.facturacion_operadores_caja;
+CREATE POLICY facturacion_operadores_caja_write
+ON public.facturacion_operadores_caja FOR ALL TO authenticated
+USING (public.can_edit_module('facturacion'))
+WITH CHECK (public.can_edit_module('facturacion'));
 
 -- Configuraciones Sistema
 DROP POLICY IF EXISTS configuraciones_select_admin ON public.configuraciones_sistema;
@@ -602,32 +621,16 @@ DROP FUNCTION IF EXISTS public.marcar_registros_obsoletos_10dias();
 
 ALTER TABLE facturacion_pedidos ADD COLUMN IF NOT EXISTS operador_caja TEXT; 
 
--- Tabla para los operadores de caja
-CREATE TABLE IF NOT EXISTS facturacion_operadores_caja (
-  id SERIAL PRIMARY KEY,
-  nombre TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Agregar la columna operador_caja en facturacion_pedidos si no existe
 ALTER TABLE facturacion_pedidos ADD COLUMN IF NOT EXISTS operador_caja TEXT;
-
--- 1. Asegurar que la tabla de operadores de caja existe
-CREATE TABLE IF NOT EXISTS facturacion_operadores_caja (
-  id SERIAL PRIMARY KEY,
-  nombre TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- 2. Habilitar RLS en las tablas de catálogos de facturación
 ALTER TABLE facturacion_tiendas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE facturacion_operadores ENABLE ROW LEVEL SECURITY;
-ALTER TABLE facturacion_operadores_caja ENABLE ROW LEVEL SECURITY;
 
 -- 3. Políticas de lectura (todos los usuarios autenticados con rol viewer/editor/admin pueden leer)
 CREATE POLICY "Permitir lectura de tiendas" ON facturacion_tiendas FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Permitir lectura de operadores" ON facturacion_operadores FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Permitir lectura de operadores caja" ON facturacion_operadores_caja FOR SELECT USING (auth.role() = 'authenticated');
 
 -- 4. Políticas de escritura/modificación (solo usuarios con rol editor o admin según permisos actuales)
 -- Asumiendo que utilizas tu función current_user_role() o validación por metadatos, o permitiendo autenticados con rol operativo:
@@ -636,10 +639,6 @@ CREATE POLICY "Permitir escritura en tiendas" ON facturacion_tiendas FOR ALL USI
 );
 
 CREATE POLICY "Permitir escritura en operadores" ON facturacion_operadores FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('editor', 'admin'))
-);
-
-CREATE POLICY "Permitir escritura en operadores caja" ON facturacion_operadores_caja FOR ALL USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('editor', 'admin'))
 );
 
