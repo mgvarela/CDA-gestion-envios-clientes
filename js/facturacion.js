@@ -2,7 +2,9 @@ let listaFacturacion = [];
 let vistaFacturacion = 'principal';
 let tiendasFacturacion = [];
 let operadoresFacturacion = [];
-const OPERADORES_CAJA_FIJOS = ['Nuria', 'Gabriela'];
+const OPERADORES_CAJA_FIJOS = ['Nuria', 'Gabriela', 'Gisela'];
+let operadoresCajaFacturacion = [...OPERADORES_CAJA_FIJOS];
+let operadoresCajaFacturacionCargados = false;
 
 const TIENDAS_FACTURACION_INICIALES = ['Provincia Wins', 'Personal', 'Shell', 'Infobae', 'Nación', 'Credicoop', 'Comafi', 'Macro'];
 
@@ -38,6 +40,8 @@ async function cargarFacturacion() {
   const tbody = document.getElementById('tblFacturacion');
   if (!tbody || !(await requireAuth())) return;
 
+  if (!operadoresCajaFacturacionCargados) await cargarOperadoresCajaFacturacion();
+
   const { data, error } = await supabaseClient
     .from('facturacion_pedidos')
     .select('*')
@@ -50,6 +54,24 @@ async function cargarFacturacion() {
 
   listaFacturacion = data || [];
   renderizarFacturacion();
+}
+
+async function cargarOperadoresCajaFacturacion() {
+  const { data, error } = await supabaseClient
+    .from('facturacion_operadores_caja')
+    .select('nombre')
+    .order('nombre');
+
+  if (error) {
+    mostrarNotificacion('No se pudieron cargar los operadores de caja: ' + error.message, 'danger');
+    return;
+  }
+
+  operadoresCajaFacturacion = Array.from(new Set([
+    ...OPERADORES_CAJA_FIJOS,
+    ...(data || []).map(item => textoFacturacion(item.nombre, 100)).filter(Boolean)
+  ]));
+  operadoresCajaFacturacionCargados = true;
 }
 
 function estadoClaseFacturacion(estado) {
@@ -68,9 +90,9 @@ function renderizarFacturacion() {
   const tiendaFiltro = document.getElementById('filtroTiendaFacturacion')?.value || '';
   const operadorCajaFiltro = document.getElementById('filtroOperadorCajaFacturacion')?.value || '';
 
-  // Poblar selects superiores utilizando OPERADORES_CAJA_FIJOS
+  // Poblar el filtro con los operadores iniciales y los agregados desde el catálogo.
   cargarSelectCatalogoFacturacion('filtroTiendaFacturacion', tiendasFacturacion, 'Todas las tiendas', tiendaFiltro);
-  cargarSelectCatalogoFacturacion('filtroOperadorCajaFacturacion', OPERADORES_CAJA_FIJOS, 'Todos los operadores caja', operadorCajaFiltro);
+  cargarSelectCatalogoFacturacion('filtroOperadorCajaFacturacion', operadoresCajaFacturacion, 'Todos los operadores caja', operadorCajaFiltro);
 
   const pendientesCaja = listaFacturacion.filter(item => item.en_caja && item.estado !== 'Facturado');
   const facturados = listaFacturacion.filter(item => item.estado === 'Facturado');
@@ -125,7 +147,7 @@ function renderizarFacturacion() {
       selectOperadorCaja = puedeEditar
         ? `<select class="form-select form-select-sm" onchange="actualizarOperadorCaja('${item.id}', this.value)">
              <option value="">Seleccionar...</option>
-             ${OPERADORES_CAJA_FIJOS.map(op => `<option value="${escapeHtml(op)}" ${item.operador_caja === op ? 'selected' : ''}>${escapeHtml(op)}</option>`).join('')}
+             ${operadoresCajaFacturacion.map(op => `<option value="${escapeHtml(op)}" ${item.operador_caja === op ? 'selected' : ''}>${escapeHtml(op)}</option>`).join('')}
            </select>`
         : `<span>${escapeHtml(item.operador_caja || '-')}</span>`;
     } else if (vistaFacturacion === 'facturados') {
@@ -178,10 +200,12 @@ async function abrirModalFacturacion(id = '') {
 async function agregarCatalogoFacturacion(tipo) {
   if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
   const esTienda = tipo === 'tienda';
+  const esOperadorCaja = tipo === 'operador_caja';
   document.getElementById('formCatalogoFacturacion').reset();
   document.getElementById('factCatalogoTipo').value = tipo;
-  document.getElementById('modalCatalogoFacturacionLabel').innerHTML = `<i class="bi bi-plus-circle text-primary me-2"></i>Agregar ${esTienda ? 'tienda' : 'operador'}`;
-  document.getElementById('factCatalogoNombreLabel').textContent = `Nombre de ${esTienda ? 'la tienda' : 'el operador'}`;
+  const nombreCatalogo = esTienda ? 'tienda' : esOperadorCaja ? 'operador de caja' : 'operador';
+  document.getElementById('modalCatalogoFacturacionLabel').innerHTML = `<i class="bi bi-plus-circle text-primary me-2"></i>Agregar ${nombreCatalogo}`;
+  document.getElementById('factCatalogoNombreLabel').textContent = esTienda ? 'Nombre de la tienda' : `Nombre del ${nombreCatalogo}`;
   const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCatalogoFacturacion'));
   modal.show();
   document.getElementById('modalCatalogoFacturacion').addEventListener('shown.bs.modal', () => document.getElementById('factCatalogoNombre').focus(), { once: true });
@@ -192,11 +216,23 @@ async function guardarCatalogoFacturacion(event) {
   if (!(await requireAuth()) || !puedeEditarFacturacion()) return;
   const tipo = document.getElementById('factCatalogoTipo').value;
   const nombre = textoFacturacion(document.getElementById('factCatalogoNombre').value, 100);
-  if (!nombre) return;
-  const tabla = tipo === 'tienda' ? 'facturacion_tiendas' : 'facturacion_operadores';
+  if (!nombre) return mostrarNotificacion('Ingresá un nombre para el catálogo.', 'warning');
+  const tabla = tipo === 'tienda'
+    ? 'facturacion_tiendas'
+    : tipo === 'operador_caja'
+      ? 'facturacion_operadores_caja'
+      : 'facturacion_operadores';
   const { error } = await supabaseClient.from(tabla).upsert({ nombre }, { onConflict: 'nombre' });
-  if (error) return mostrarNotificacion(`No se pudo agregar el ${tipo}: ${error.message}`, 'danger');
+  if (error) return mostrarNotificacion(`No se pudo agregar el ${tipo === 'operador_caja' ? 'operador de caja' : tipo}: ${error.message}`, 'danger');
   bootstrap.Modal.getInstance(document.getElementById('modalCatalogoFacturacion'))?.hide();
+
+  if (tipo === 'operador_caja') {
+    if (!operadoresCajaFacturacion.includes(nombre)) operadoresCajaFacturacion.push(nombre);
+    operadoresCajaFacturacionCargados = true;
+    renderizarFacturacion();
+    return mostrarNotificacion('Operador de caja agregado.', 'success');
+  }
+
   await cargarCatalogosFacturacion();
   cargarSelectCatalogoFacturacion(tipo === 'tienda' ? 'factTienda' : 'factOperador', tipo === 'tienda' ? tiendasFacturacion : operadoresFacturacion, tipo === 'tienda' ? 'Seleccionar tienda...' : 'Seleccionar operador...', nombre);
   mostrarNotificacion(`${tipo === 'tienda' ? 'Tienda' : 'Operador'} agregado.`, 'success');
